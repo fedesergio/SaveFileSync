@@ -1,0 +1,94 @@
+<ui:FluentWindow x:Class="SaveFileSync.App.Views.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:vm="clr-namespace:SaveFileSync.App.ViewModels"
+                 Title="SaveFileSync"
+                 Width="920" Height="640" MinWidth="640" MinHeight="420"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <ui:TitleBar Grid.Row="0" Title="SaveFileSync" />
+
+    <Grid Grid.Row="1" Margin="24,8,24,8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="Library" FontSize="24" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Summary}" Style="{StaticResource Secondary}" Margin="0,4,0,0" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <ui:Button Content="Add game" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Click="OnAddGame" Margin="0,0,8,0" />
+        <ui:Button Content="Sync all now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncAllCommand}" Margin="0,0,8,0" />
+        <ui:Button Command="{Binding TogglePauseCommand}" Icon="{ui:SymbolIcon Pause24}">
+          <ui:Button.Style>
+            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+              <Setter Property="Content" Value="Pause" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                  <Setter Property="Content" Value="Resume" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ui:Button.Style>
+        </ui:Button>
+      </StackPanel>
+    </Grid>
+
+    <ui:InfoBar Grid.Row="2" Margin="24,0,24,8" Severity="Error" Title="Sync stopped"
+                Message="{Binding Problem}" IsClosable="False"
+                IsOpen="{Binding Problem, Converter={x:Static vm:Converters.NotNull}}" />
+
+    <Grid Grid.Row="3" Margin="24,0,24,0">
+      <TextBlock Text="No games yet. Use “Add game” to choose a save folder to sync."
+                 Style="{StaticResource Secondary}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 Visibility="{Binding HasUnits, Converter={StaticResource InverseBoolToVisibility}}" />
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding Units}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="{x:Type vm:UnitItemViewModel}">
+              <ui:CardAction Margin="0,0,0,8" Click="OnUnitClicked" Tag="{Binding UnitId}" Icon="{ui:SymbolIcon Games24}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding LastSyncText}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0" />
+                  </StackPanel>
+                  <Border Grid.Column="1" Style="{StaticResource Chip}" Background="{Binding State, Converter={StaticResource StateToBrush}}" Margin="12,0,0,0">
+                    <TextBlock Text="{Binding State, Converter={StaticResource StateToText}}" Foreground="White" FontSize="12" />
+                  </Border>
+                </Grid>
+              </ui:CardAction>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+
+    <Grid Grid.Row="4" Margin="24,8,24,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Style="{StaticResource Secondary}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+        <Run Text="{Binding DeviceName, Mode=OneWay}" /><Run Text=" · repository: " /><Run Text="{Binding RepositoryPath, Mode=OneWay}" /><Run Text=" · v" /><Run Text="{Binding Version, Mode=OneWay}" />
+      </TextBlock>
+      <CheckBox Grid.Column="1" Content="Start with Windows" IsChecked="{Binding StartWithWindows}" />
+    </Grid>
+  </Grid>
+</ui:FluentWindow>

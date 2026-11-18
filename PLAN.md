@@ -64,6 +64,7 @@ needs no admin rights and no Windows service.
   again only opens the main window of the running instance (via a named pipe).
 - **Background memory target:** under about 80 MB working set, with no window
   open. The parsed manifest index is loaded only when it is needed.
+  Measured at v0.1.0 (release, no window): 97 MB working set, 31 MB private.
 
 ### 2.2 Solution layout
 
@@ -105,9 +106,12 @@ Prerequisite: install the **.NET 10 SDK**. Only 8.0.200 is installed today, and
 
 ### 2.4 Distribution
 
-`dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true`
+`dotnet publish src/SaveFileSync.App -c Release` (the project sets `win-x64`,
+self-contained, single-file, native libraries included).
 
-- The output is about 70–90 MB.
+- The output is about 160 MB. Single-file compression would bring it to about
+  70 MB, but it was measured to raise background memory from 31 to 113 MB
+  private (97 vs 244 MB working set), so it is disabled.
 - On first run the exe offers to copy itself to
   `%LOCALAPPDATA%\Programs\SaveFileSync\` and to register autostart.
 - Updates are manual: replace the exe. "Exit" in the tray releases the file.

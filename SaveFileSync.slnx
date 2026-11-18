@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SaveFileSync.Core/SaveFileSync.Core.csproj" />
+    <Project Path="src/SaveFileSync.Repository/SaveFileSync.Repository.csproj" />
+    <Project Path="src/SaveFileSync.Windows/SaveFileSync.Windows.csproj" />
+    <Project Path="src/SaveFileSync.App/SaveFileSync.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SaveFileSync.Core.Tests/SaveFileSync.Core.Tests.csproj" />
+    <Project Path="tests/SaveFileSync.Simulation.Tests/SaveFileSync.Simulation.Tests.csproj" />
+  </Folder>
+  <Folder Name="/solution/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="PLAN.md" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

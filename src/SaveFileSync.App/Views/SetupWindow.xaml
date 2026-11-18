@@ -1,0 +1,43 @@
+<ui:FluentWindow x:Class="SaveFileSync.App.Views.SetupWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Set up SaveFileSync"
+                 Width="640" SizeToContent="Height"
+                 ResizeMode="NoResize"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+  <StackPanel>
+    <ui:TitleBar Title="Set up SaveFileSync" ShowMaximize="False" ShowMinimize="False" />
+    <StackPanel Margin="24,8,24,24">
+      <TextBlock Text="Welcome" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Style="{StaticResource Secondary}" Margin="0,4,0,0"
+                 Text="SaveFileSync keeps game saves in sync between your PCs through a folder in OneDrive. Choose the same folder on every PC." />
+
+      <TextBlock Text="Repository folder (inside OneDrive)" Style="{StaticResource SectionTitle}" />
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ui:TextBox x:Name="RepoPath" PlaceholderText="e.g. C:\Users\you\OneDrive\SaveFileSync" TextChanged="OnInputChanged" />
+        <ui:Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowse" />
+      </Grid>
+      <ui:InfoBar x:Name="RepoInfo" Margin="0,8,0,0" IsClosable="False" />
+
+      <TextBlock Text="Name of this PC" Style="{StaticResource SectionTitle}" />
+      <ui:TextBox x:Name="DeviceName" PlaceholderText="e.g. Desktop, Ally" TextChanged="OnInputChanged" />
+      <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
+                 Text="Shown on the other PCs, e.g. “newer save from Desktop”." />
+
+      <CheckBox x:Name="StartWithWindows" Content="Start with Windows (in the notification area)" IsChecked="True" Margin="0,16,0,0" />
+      <CheckBox x:Name="Install" Content="Install for this user (copy to %LOCALAPPDATA%\Programs\SaveFileSync)" IsChecked="True" Margin="0,8,0,0" />
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+        <ui:Button Content="Cancel" Click="OnCancel" Margin="0,0,8,0" />
+        <ui:Button x:Name="ContinueButton" Content="Continue" Appearance="Primary" Click="OnContinue" />
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</ui:FluentWindow>
