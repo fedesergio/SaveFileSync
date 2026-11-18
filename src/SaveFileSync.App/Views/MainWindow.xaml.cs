@@ -25,6 +25,12 @@ public partial class MainWindow : FluentWindow
         new AddUnitWindow(_host) { Owner = this }.ShowDialog();
     }
 
+    private void OnActivity(object sender, RoutedEventArgs e) =>
+        new ActivityWindow(_host) { Owner = this }.Show();
+
+    private void OnSettings(object sender, RoutedEventArgs e) =>
+        new SettingsWindow(_host) { Owner = this }.ShowDialog();
+
     private void OnUnitClicked(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string unitId })

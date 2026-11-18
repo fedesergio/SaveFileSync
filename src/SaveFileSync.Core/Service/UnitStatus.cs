@@ -42,4 +42,18 @@ public enum NotificationLevel
     Error,
 }
 
+public enum ActivityKind
+{
+    Info,
+    Uploaded,
+    Downloaded,
+    Merged,
+    Conflict,
+    Resolved,
+    Warning,
+    Error,
+}
+
+public sealed record ActivityEntry(DateTime TimeUtc, string UnitName, ActivityKind Kind, string Message);
+
 public sealed record SyncNotification(string Title, string Message, NotificationLevel Level, string? UnitId);

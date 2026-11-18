@@ -14,6 +14,13 @@ public abstract record SyncPlan
     public sealed record Pull(string TargetVersionId) : SyncPlan;
 
     /// <summary>
+    /// Disjoint changes were merged (phase 1b, folder/file granularity): create a merge
+    /// version with <see cref="Content"/> and these parents, then apply it locally.
+    /// Local files equal the base when this plan is produced.
+    /// </summary>
+    public sealed record MergeApply(IReadOnlyList<string> Parents, Snapshot Content) : SyncPlan;
+
+    /// <summary>
     /// The user must choose. When <see cref="PreserveLocalFirst"/> is set, the local files
     /// differ from every candidate and must be pushed (with <see cref="PreserveParents"/>)
     /// before the conflict is recorded, so that local work is never lost (PLAN.md §6.2).
@@ -22,7 +29,8 @@ public abstract record SyncPlan
         IReadOnlyList<string> CandidateVersionIds,
         bool PreserveLocalFirst,
         IReadOnlyList<string> PreserveParents,
-        ConflictReason Reason) : SyncPlan;
+        ConflictReason Reason,
+        IReadOnlyList<string>? Groups = null) : SyncPlan;
 
     /// <summary>
     /// All local files disappeared although the base has files. Never propagated
@@ -42,13 +50,13 @@ public enum ConflictReason
 }
 
 /// <summary>
-/// Pure decision function: base + local snapshot + remote DAG → plan (PLAN.md §6.2).
-/// Phase 1a implements <see cref="MergeGranularity.Unit"/> only: the whole unit is
-/// compared as one group.
+/// Pure decision function: base + local snapshot + remote DAG → plan (PLAN.md §6.2, §6.4).
+/// The same algorithm serves every granularity; <see cref="MergeGranularity.Unit"/> is the
+/// special case where the whole unit is a single group.
 /// </summary>
 public static class Planner
 {
-    public static SyncPlan Decide(string? baseVersionId, Snapshot local, VersionGraph graph)
+    public static SyncPlan Decide(string? baseVersionId, Snapshot local, VersionGraph graph, MergeGranularity granularity = MergeGranularity.Unit)
     {
         if (graph.IsEmpty)
         {
@@ -83,8 +91,10 @@ public static class Planner
         // Fold every other tip into "current", which starts as the local content.
         var current = local;
         VersionManifest? pulledTip = null;
+        var merged = false;
         var lineage = new List<string> { baseVersion.VersionId };
         var conflicting = new List<VersionManifest>();
+        var conflictGroups = new List<string>();
 
         foreach (var tip in tips.Where(t => t.VersionId != baseVersion.VersionId))
         {
@@ -94,26 +104,33 @@ public static class Planner
                 continue;
             }
 
-            var lca = graph.LowestCommonAncestor(lineage, tip.VersionId);
-            var mergeBase = lca?.Content ?? Snapshot.Empty;
-            var currentChanged = !current.ContentEquals(mergeBase);
-            var tipChanged = !tip.Content.ContentEquals(mergeBase);
+            var result = Merge.WithGraph(graph, lineage, current, tip.VersionId, granularity);
 
-            if (!tipChanged)
+            if (result.HasConflicts)
+            {
+                conflicting.Add(tip);
+                conflictGroups.AddRange(result.ConflictGroups);
+                continue;
+            }
+
+            lineage.Add(tip.VersionId);
+            if (result.Merged.ContentEquals(current))
             {
                 // The other side has nothing new (e.g. it only adopted an old version).
-                lineage.Add(tip.VersionId);
+                continue;
             }
-            else if (!currentChanged)
+
+            if (result.Merged.ContentEquals(tip.Content) && !merged)
             {
-                current = tip.Content;
                 pulledTip = tip;
-                lineage.Add(tip.VersionId);
             }
             else
             {
-                conflicting.Add(tip);
+                merged = true;
+                pulledTip = null;
             }
+
+            current = result.Merged;
         }
 
         if (conflicting.Count > 0)
@@ -123,11 +140,10 @@ public static class Planner
             if (!preserve)
             {
                 // The local content is already in the repository: offer the version that holds it.
-                candidates.Add(pulledTip is null
-                    ? tips.FirstOrDefault(t => t.Content.ContentEquals(local)) ?? baseVersion
-                    : pulledTip);
+                candidates.Add(tips.FirstOrDefault(t => t.Content.ContentEquals(local)) ?? baseVersion);
             }
-            else if (pulledTip is not null)
+
+            if (pulledTip is not null)
             {
                 candidates.Add(pulledTip);
             }
@@ -137,10 +153,11 @@ public static class Planner
                 DistinctByContent(candidates).Select(v => v.VersionId).ToList(),
                 preserve,
                 preserve ? [baseVersion.VersionId] : [],
-                ConflictReason.BothChanged);
+                ConflictReason.BothChanged,
+                conflictGroups.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
         }
 
-        if (pulledTip is null)
+        if (current.ContentEquals(local))
         {
             if (!localChanged)
             {
@@ -168,12 +185,14 @@ public static class Planner
 
         if (localChanged)
         {
-            // Local edits that "equal the old merge base" (e.g. a manual revert) would be
-            // overwritten by the pull: push them first so they are preserved, then re-plan.
+            // Remote changes must be combined with local edits: publish the local edits
+            // first so they are preserved whatever happens, then re-plan from them.
             return new SyncPlan.Push([baseVersion.VersionId], VersionKind.Normal);
         }
 
-        return new SyncPlan.Pull(pulledTip.VersionId);
+        return pulledTip is not null && !merged
+            ? new SyncPlan.Pull(pulledTip.VersionId)
+            : new SyncPlan.MergeApply(lineage, current);
     }
 
     private static (SyncPlan? Plan, VersionManifest? AdoptedBase) DecideWithUnknownBase(

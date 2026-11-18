@@ -3,41 +3,92 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="Set up SaveFileSync"
-                 Width="640" SizeToContent="Height"
+                 Width="680" Height="560"
                  ResizeMode="NoResize"
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica">
-  <StackPanel>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
     <ui:TitleBar Title="Set up SaveFileSync" ShowMaximize="False" ShowMinimize="False" />
-    <StackPanel Margin="24,8,24,24">
-      <TextBlock Text="Welcome" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Style="{StaticResource Secondary}" Margin="0,4,0,0"
-                 Text="SaveFileSync keeps game saves in sync between your PCs through a folder in OneDrive. Choose the same folder on every PC." />
+    <TextBlock x:Name="StepCounter" Grid.Row="1" Margin="24,0,24,0" Style="{StaticResource Secondary}" FontSize="12" />
 
-      <TextBlock Text="Repository folder (inside OneDrive)" Style="{StaticResource SectionTitle}" />
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <ui:TextBox x:Name="RepoPath" PlaceholderText="e.g. C:\Users\you\OneDrive\SaveFileSync" TextChanged="OnInputChanged" />
-        <ui:Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowse" />
-      </Grid>
-      <ui:InfoBar x:Name="RepoInfo" Margin="0,8,0,0" IsClosable="False" />
-
-      <TextBlock Text="Name of this PC" Style="{StaticResource SectionTitle}" />
-      <ui:TextBox x:Name="DeviceName" PlaceholderText="e.g. Desktop, Ally" TextChanged="OnInputChanged" />
-      <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
-                 Text="Shown on the other PCs, e.g. “newer save from Desktop”." />
-
-      <CheckBox x:Name="StartWithWindows" Content="Start with Windows (in the notification area)" IsChecked="True" Margin="0,16,0,0" />
-      <CheckBox x:Name="Install" Content="Install for this user (copy to %LOCALAPPDATA%\Programs\SaveFileSync)" IsChecked="True" Margin="0,8,0,0" />
-
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
-        <ui:Button Content="Cancel" Click="OnCancel" Margin="0,0,8,0" />
-        <ui:Button x:Name="ContinueButton" Content="Continue" Appearance="Primary" Click="OnContinue" />
+    <Grid Grid.Row="2" Margin="24,8,24,8">
+      <!-- 1. Welcome -->
+      <StackPanel x:Name="StepWelcome">
+        <TextBlock Text="Welcome" FontSize="26" FontWeight="SemiBold" />
+        <TextBlock Style="{StaticResource Secondary}" Margin="0,12,0,0"
+                   Text="SaveFileSync keeps the saves of your non-Steam games and emulators in sync between your PCs, through a folder in your OneDrive." />
+        <TextBlock Style="{StaticResource Secondary}" Margin="0,12,0,0"
+                   Text="• It waits until a game is closed (or has stopped writing for a while) before uploading.&#x0a;• It never overwrites saves while a game is running.&#x0a;• When the same save changed on two PCs, it asks you which version to keep — and keeps both in the history." />
+        <TextBlock Style="{StaticResource Secondary}" Margin="0,12,0,0"
+                   Text="You will choose the shared folder, a name for this PC and how the app starts. It takes a minute." />
       </StackPanel>
-    </StackPanel>
-  </StackPanel>
+
+      <!-- 2. Repository -->
+      <StackPanel x:Name="StepRepository" Visibility="Collapsed">
+        <TextBlock Text="Shared folder in OneDrive" FontSize="22" FontWeight="SemiBold" />
+        <TextBlock Style="{StaticResource Secondary}" Margin="0,8,0,12"
+                   Text="Choose the same folder on every PC. SaveFileSync manages its contents: never edit it by hand." />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ui:TextBox x:Name="RepoPath" PlaceholderText="e.g. C:\Users\you\OneDrive\SaveFileSync" TextChanged="OnInputChanged" />
+          <ui:Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowse" />
+        </Grid>
+        <ui:InfoBar x:Name="RepoInfo" Margin="0,8,0,0" IsClosable="False" />
+      </StackPanel>
+
+      <!-- 3. This PC -->
+      <StackPanel x:Name="StepDevice" Visibility="Collapsed">
+        <TextBlock Text="This PC" FontSize="22" FontWeight="SemiBold" />
+        <TextBlock Text="Name" Style="{StaticResource SectionTitle}" />
+        <ui:TextBox x:Name="DeviceName" PlaceholderText="e.g. Desktop, Ally" TextChanged="OnInputChanged" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
+                   Text="Shown on the other PCs, e.g. “newer save from Desktop”." />
+        <TextBlock Text="Game library folders (optional)" Style="{StaticResource SectionTitle}" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12"
+                   Text="Where games are installed on this PC (e.g. C:\Games). Used to find save folders automatically in a later version." />
+        <ListBox x:Name="Roots" Height="90" Margin="0,8,0,0" />
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <ui:Button Content="Add folder…" Click="OnAddRoot" Margin="0,0,8,0" />
+          <ui:Button Content="Remove" Click="OnRemoveRoot" />
+        </StackPanel>
+      </StackPanel>
+
+      <!-- 4. Startup -->
+      <StackPanel x:Name="StepStartup" Visibility="Collapsed">
+        <TextBlock Text="Running in the background" FontSize="22" FontWeight="SemiBold" />
+        <TextBlock Style="{StaticResource Secondary}" Margin="0,8,0,12"
+                   Text="SaveFileSync lives in the notification area. Closing its window does not stop syncing; use Exit in the tray menu." />
+        <CheckBox x:Name="StartWithWindows" Content="Start with Windows" IsChecked="True" />
+        <CheckBox x:Name="Install" Content="Install for this user (copy to %LOCALAPPDATA%\Programs\SaveFileSync)" IsChecked="True" Margin="0,8,0,0" />
+        <TextBlock x:Name="InstallHint" Style="{StaticResource Secondary}" FontSize="12" Margin="28,4,0,0"
+                   Text="Recommended: the app keeps working even if you delete the file you downloaded. No admin rights are needed." />
+      </StackPanel>
+
+      <!-- 5. Summary -->
+      <StackPanel x:Name="StepSummary" Visibility="Collapsed">
+        <TextBlock Text="Ready" FontSize="22" FontWeight="SemiBold" />
+        <TextBlock x:Name="Summary" Style="{StaticResource Secondary}" Margin="0,12,0,0" />
+        <TextBlock Style="{StaticResource Secondary}" Margin="0,12,0,0"
+                   Text="Next: use “Add game” to choose a save folder, or set up on this PC the games that your other PCs already sync." />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="3" Margin="24,8,24,16">
+      <ui:Button Content="Cancel" Click="OnCancel" HorizontalAlignment="Left" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <ui:Button x:Name="BackButton" Content="Back" Click="OnBack" Margin="0,0,8,0" />
+        <ui:Button x:Name="NextButton" Content="Next" Appearance="Primary" Click="OnNext" />
+      </StackPanel>
+    </Grid>
+  </Grid>
 </ui:FluentWindow>

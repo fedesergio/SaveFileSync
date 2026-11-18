@@ -1,0 +1,77 @@
+<ui:FluentWindow x:Class="SaveFileSync.App.Views.SettingsWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Settings"
+                 Width="720" Height="720"
+                 WindowStartupLocation="CenterOwner"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <ui:TitleBar Title="Settings" ShowMaximize="False" ShowMinimize="False" />
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="24,0,24,8">
+        <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+
+        <TextBlock Text="This PC" Style="{StaticResource SectionTitle}" />
+        <ui:TextBox x:Name="DeviceName" PlaceholderText="Name shown on the other PCs" />
+        <CheckBox x:Name="StartWithWindows" Content="Start with Windows" Margin="0,8,0,0" />
+
+        <TextBlock Text="Shared folder" Style="{StaticResource SectionTitle}" />
+        <TextBlock x:Name="RepositoryPath" TextWrapping="Wrap" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
+                   Text="To use a different folder, exit the app, delete config.json in the app data folder and start it again." />
+
+        <TextBlock Text="Timing" Style="{StaticResource SectionTitle}" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="140" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <TextBlock Text="Quiet period before uploading (seconds)" VerticalAlignment="Center" />
+          <ui:NumberBox x:Name="QuietSeconds" Grid.Column="1" Minimum="10" Maximum="3600" SmallChange="10" />
+          <TextBlock Grid.Row="1" Text="Wait after the game closes (seconds)" VerticalAlignment="Center" Margin="0,8,0,0" />
+          <ui:NumberBox x:Name="ExitDelaySeconds" Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="600" SmallChange="5" Margin="0,8,0,0" />
+          <TextBlock Grid.Row="2" Text="Upload anyway if the game stays open but idle (minutes)" VerticalAlignment="Center" Margin="0,8,0,0" />
+          <ui:NumberBox x:Name="InPlayCapMinutes" Grid.Row="2" Grid.Column="1" Minimum="1" Maximum="1440" SmallChange="5" Margin="0,8,0,0" />
+        </Grid>
+
+        <TextBlock Text="Game library folders" Style="{StaticResource SectionTitle}" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12"
+                   Text="Where games are installed on this PC. Used to find save folders automatically in a later version." />
+        <ListBox x:Name="Roots" Height="90" Margin="0,8,0,0" />
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <ui:Button Content="Add folder…" Click="OnAddRoot" Margin="0,0,8,0" />
+          <ui:Button Content="Remove" Click="OnRemoveRoot" />
+        </StackPanel>
+
+        <TextBlock Text="Troubleshooting" Style="{StaticResource SectionTitle}" />
+        <WrapPanel>
+          <ui:Button Content="Open logs" Icon="{ui:SymbolIcon DocumentText24}" Click="OnOpenLogs" Margin="0,0,8,8" />
+          <ui:Button Content="Export diagnostics…" Icon="{ui:SymbolIcon ArrowExport24}" Click="OnExportDiagnostics" Margin="0,0,8,8" />
+        </WrapPanel>
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12"
+                   Text="Diagnostics contain logs and settings, with your user name and profile path replaced by placeholders. They contain no save files." />
+
+        <TextBlock Text="About" Style="{StaticResource SectionTitle}" />
+        <TextBlock x:Name="About" Style="{StaticResource Secondary}" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="24,8,24,16">
+      <ui:Button Content="Cancel" Click="OnCancel" Margin="0,0,8,0" />
+      <ui:Button Content="Save" Appearance="Primary" Click="OnSave" />
+    </StackPanel>
+  </Grid>
+</ui:FluentWindow>

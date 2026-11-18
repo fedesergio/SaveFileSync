@@ -25,7 +25,7 @@ public sealed class RecoveryService
 
     public IReadOnlyList<RecoveryUnit> ListUnits()
     {
-        var devices = _remote.ReadDevices().ToDictionary(d => d.DeviceId, d => d.Name, StringComparer.Ordinal);
+        var devices = _remote.ReadDevices().GroupBy(d => d.DeviceId).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
         var result = new List<RecoveryUnit>();
         foreach (var unitId in _remote.ListUnitIds())
         {
@@ -72,7 +72,7 @@ public sealed class RecoveryService
     /// </summary>
     public ExportReport Export(string unitId, string targetFolder, string? versionId = null)
     {
-        var devices = _remote.ReadDevices().ToDictionary(d => d.DeviceId, d => d.Name, StringComparer.Ordinal);
+        var devices = _remote.ReadDevices().GroupBy(d => d.DeviceId).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
         var (all, graph) = Load(unitId);
         List<VersionManifest> selected;
         if (versionId is not null)

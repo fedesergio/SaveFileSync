@@ -18,12 +18,16 @@ public sealed class CommandLine
 
     public bool Background { get; private init; }
 
+    /// <summary>Dev only: open and close every window to catch XAML errors at runtime.</summary>
+    public bool SelfTestUi { get; private init; }
+
     public bool IsCli => Command is "list" or "export" or "help" or "--help" or "-h" or "/?";
 
     public static CommandLine Parse(IReadOnlyList<string> args)
     {
         string? profile = null, repo = null, version = null, command = null;
         var background = false;
+        var selfTestUi = false;
         var positional = new List<string>();
 
         for (var i = 0; i < args.Count; i++)
@@ -42,6 +46,9 @@ public sealed class CommandLine
                     break;
                 case "--background":
                     background = true;
+                    break;
+                case "--selftest-ui":
+                    selfTestUi = true;
                     break;
                 default:
                     if (command is null)
@@ -65,6 +72,7 @@ public sealed class CommandLine
             Repo = repo,
             Version = version,
             Background = background,
+            SelfTestUi = selfTestUi,
         };
     }
 }

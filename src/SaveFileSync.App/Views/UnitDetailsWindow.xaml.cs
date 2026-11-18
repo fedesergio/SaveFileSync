@@ -43,6 +43,9 @@ public partial class UnitDetailsWindow : FluentWindow
         Locations.ItemsSource = _locations;
         GameName.Text = _definition.Name;
         ProcessNames.Text = string.Join("; ", _definition.ProcessNames.Select(p => p + ".exe"));
+        Granularity.ItemsSource = GranularityOptions.Texts;
+        Granularity.SelectedIndex = GranularityOptions.IndexOf(_definition.Granularity);
+        GranularityHint.Text = GranularityOptions.Hint;
 
         host.Service.StatusChanged += OnStatusChanged;
         Closed += (_, _) => host.Service.StatusChanged -= OnStatusChanged;
@@ -140,7 +143,7 @@ public partial class UnitDetailsWindow : FluentWindow
                 Name = GameName.Text.Trim().Length > 0 ? GameName.Text.Trim() : _definition.Name,
                 Locations = _locations.Select(l => l.ToDefinition()).ToList(),
                 ProcessNames = LocationRow.Split(ProcessNames.Text),
-                Granularity = _definition.Granularity,
+                Granularity = GranularityOptions.At(Granularity.SelectedIndex),
                 Mode = _definition.Mode,
             };
 
@@ -159,8 +162,32 @@ public partial class UnitDetailsWindow : FluentWindow
         }
     }
 
+    private async void OnExport(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = $"Export the latest saves of {_definition.Name} to…" };
+        if (dialog.ShowDialog(this) != true || _host.Remote is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var target = dialog.FolderName;
+            var remote = _host.Remote;
+            var report = await Task.Run(() => new Core.Recovery.RecoveryService(remote).Export(_unitId, target));
+            var problems = report.Problems.Count == 0 ? "" : $"\n\nProblems:\n{string.Join("\n", report.Problems.Take(10))}";
+            MessageBox.Show(this, $"{report.FilesWritten} file(s) exported to:\n{string.Join("\n", report.ExportedFolders)}{problems}",
+                "Export", MessageBoxButton.OK, report.Problems.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Export", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private bool DefinitionChanged(UnitDefinition updated) =>
-        updated.Name != _definition.Name
+        updated.Granularity != _definition.Granularity
+        || updated.Name != _definition.Name
         || !updated.ProcessNames.Select(SyncService.NormalizeProcessName).SequenceEqual(_definition.ProcessNames)
         || !updated.Locations.Select(l => (string.Join(";", l.Includes), string.Join(";", l.Excludes)))
             .SequenceEqual(_definition.Locations.Select(l => (string.Join(";", l.Includes), string.Join(";", l.Excludes))));

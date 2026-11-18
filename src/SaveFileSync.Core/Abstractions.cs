@@ -77,6 +77,13 @@ public interface IRemoteStore
     Stream OpenBlob(string sha256);
 }
 
+/// <summary>Optional diagnostics offered by a repository implementation.</summary>
+public interface IRepositoryDiagnostics
+{
+    /// <summary>Files ignored because they look like OneDrive conflict copies or foreign files.</summary>
+    IReadOnlyList<string> FindIgnoredFiles();
+}
+
 /// <summary>A blob exists but cannot be read now (e.g. OneDrive is not running to download it).</summary>
 public sealed class BlobUnavailableException(string sha256, Exception inner)
     : IOException($"Blob {sha256} cannot be read yet: {inner.Message}", inner);

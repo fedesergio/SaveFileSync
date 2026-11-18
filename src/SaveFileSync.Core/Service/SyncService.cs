@@ -46,6 +46,7 @@ public sealed class SyncService : IDisposable
     private readonly AutoResetEvent _wake = new(false);
     private readonly Dictionary<string, UnitRuntime> _units = new(StringComparer.Ordinal);
     private readonly List<DateTime> _resumeChecks = [];
+    private readonly Queue<ActivityEntry> _activity = new();
 
     private Dictionary<string, string> _deviceNames = new(StringComparer.Ordinal);
     private IReadOnlySet<string> _running = new HashSet<string>();
@@ -82,6 +83,9 @@ public sealed class SyncService : IDisposable
 
     /// <summary>Raised on the worker thread for things the user should see (tray balloon).</summary>
     public event Action<SyncNotification>? Notification;
+
+    /// <summary>Raised (on any thread) when <see cref="RecentActivity"/> gets a new entry.</summary>
+    public event Action? ActivityAdded;
 
     public IReadOnlyList<UnitStatus> CurrentStatus => Volatile.Read(ref _status);
 
@@ -174,7 +178,12 @@ public sealed class SyncService : IDisposable
     }));
 
     /// <summary>Creates a new unit in the repository and binds it on this PC.</summary>
-    public Task<string> AddUnitAsync(string name, IReadOnlyList<LocationDefinition> locations, IReadOnlyList<string> processNames, IReadOnlyDictionary<string, string> bindings) =>
+    public Task<string> AddUnitAsync(
+        string name,
+        IReadOnlyList<LocationDefinition> locations,
+        IReadOnlyList<string> processNames,
+        IReadOnlyDictionary<string, string> bindings,
+        MergeGranularity granularity = MergeGranularity.Unit) =>
         Invoke(() =>
         {
             var unitId = NewUnitId(name);
@@ -184,7 +193,7 @@ public sealed class SyncService : IDisposable
                 Name = name.Trim(),
                 Locations = locations,
                 ProcessNames = processNames.Select(NormalizeProcessName).Where(p => p.Length > 0).Distinct().ToList(),
-                Granularity = MergeGranularity.Unit,
+                Granularity = granularity,
                 Revision = 1,
                 RevisionDevice = _device.ShortId,
                 UpdatedUtc = _clock.UtcNow,
@@ -194,6 +203,7 @@ public sealed class SyncService : IDisposable
             RefreshUnits();
             _units[unitId].ForceNow = true;
             _log.LogInformation("Unit {Unit} ({Name}) added", unitId, name);
+            AddActivity(name, ActivityKind.Info, "Added to sync");
             return unitId;
         });
 
@@ -263,8 +273,51 @@ public sealed class SyncService : IDisposable
         return true;
     });
 
-    public Task<SyncResult> ResolveConflictAsync(string unitId, string chosenVersionId) =>
-        RunUnitCommand(unitId, (def, bindings) => _engine.Resolve(def, bindings, chosenVersionId));
+    /// <param name="groupChoices">Per conflicting group, the version to keep (phase 1b); others use <paramref name="chosenVersionId"/>.</param>
+    public Task<SyncResult> ResolveConflictAsync(string unitId, string chosenVersionId, IReadOnlyDictionary<string, string>? groupChoices = null) =>
+        RunUnitCommand(unitId, (def, bindings) =>
+        {
+            var result = _engine.Resolve(def, bindings, chosenVersionId, groupChoices);
+            AddActivity(def.Name, ActivityKind.Resolved, "Conflict resolved");
+            return result;
+        });
+
+    /// <summary>Most recent sync operations and problems, newest first (PLAN.md §8, item 9).</summary>
+    public IReadOnlyList<ActivityEntry> RecentActivity
+    {
+        get
+        {
+            lock (_activity)
+            {
+                return _activity.Reverse().ToList();
+            }
+        }
+    }
+
+    /// <summary>Re-publishes this PC's device info (e.g. after renaming it in Settings).</summary>
+    public void RefreshDeviceInfo() => Post(() =>
+    {
+        _lastDeviceWrite = DateTime.MinValue;
+        _lastRemotePoll = DateTime.MinValue;
+    });
+
+    /// <summary>Repository files ignored as OneDrive conflict copies or foreign files (diagnostics).</summary>
+    public Task<IReadOnlyList<string>> FindIgnoredRepositoryFilesAsync() => Invoke(() =>
+        _engine.Remote is IRepositoryDiagnostics diagnostics ? diagnostics.FindIgnoredFiles() : (IReadOnlyList<string>)[]);
+
+    private void AddActivity(string unitName, ActivityKind kind, string message)
+    {
+        lock (_activity)
+        {
+            _activity.Enqueue(new ActivityEntry(_clock.UtcNow, unitName, kind, message));
+            while (_activity.Count > 300)
+            {
+                _activity.Dequeue();
+            }
+        }
+
+        ActivityAdded?.Invoke();
+    }
 
     public Task<SyncResult> RestoreFromRepositoryAsync(string unitId) =>
         RunUnitCommand(unitId, _engine.RestoreBase);
@@ -547,6 +600,7 @@ public sealed class SyncService : IDisposable
         rt.NextAttempt = DateTime.MinValue;
         rt.LastChangeDevice = BaseDeviceName(rt.UnitId);
         rt.LastSyncUtc = _engine.GetLastSyncUtc(rt.UnitId);
+        RecordActivity(rt, result);
 
         switch (result.Kind)
         {
@@ -671,8 +725,41 @@ public sealed class SyncService : IDisposable
         }
     }
 
+    private void RecordActivity(UnitRuntime rt, SyncResult result)
+    {
+        var name = rt.Definition.Name;
+        switch (result.Kind)
+        {
+            case SyncResultKind.Pushed:
+                AddActivity(name, ActivityKind.Uploaded, "Uploaded a new version");
+                break;
+            case SyncResultKind.Pulled:
+                var v = result.RemoteVersion;
+                if (v is { Kind: VersionKind.Merge } && v.DeviceId == _device.DeviceId)
+                {
+                    AddActivity(name, ActivityKind.Merged, "Merged changes made on several PCs");
+                }
+                else
+                {
+                    AddActivity(name, ActivityKind.Downloaded, v is null ? "Updated" : $"Updated from {DeviceName(v.DeviceId)}");
+                }
+
+                break;
+            case SyncResultKind.Conflict when !rt.ConflictNotified:
+                AddActivity(name, ActivityKind.Conflict, "Changed on more than one PC: waiting for your choice");
+                break;
+            case SyncResultKind.RemoteNewer when rt.Busy && result.RemoteVersion is { } r && rt.NotifiedStaleVersion != r.VersionId:
+                AddActivity(name, ActivityKind.Warning, $"Newer save from {DeviceName(r.DeviceId)} arrived while the game is open");
+                break;
+            case SyncResultKind.LocalEmptied when !rt.AttentionNotified:
+                AddActivity(name, ActivityKind.Warning, "Save folder is empty on this PC: nothing was propagated");
+                break;
+        }
+    }
+
     private void HandleFailure(UnitRuntime rt, DateTime now, Exception ex)
     {
+        AddActivity(rt.Definition.Name, ActivityKind.Error, ex.Message);
         rt.Failures++;
         rt.NextAttempt = now + Backoff[Math.Min(rt.Failures - 1, Backoff.Length - 1)];
         var message = ex switch
@@ -732,7 +819,7 @@ public sealed class SyncService : IDisposable
         var config = Config;
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        _deviceNames = remote.ReadDevices().ToDictionary(d => d.DeviceId, d => d.Name, StringComparer.Ordinal);
+        _deviceNames = remote.ReadDevices().GroupBy(d => d.DeviceId).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
 
         foreach (var unitId in remote.ListUnitIds())
         {

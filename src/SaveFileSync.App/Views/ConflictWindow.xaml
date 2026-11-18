@@ -3,7 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="Choose which version to keep"
-                 Width="760" Height="560"
+                 Width="820" Height="640"
                  WindowStartupLocation="CenterOwner"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica">
@@ -22,32 +22,55 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-      <ItemsControl x:Name="Candidates" Margin="24,0,24,0">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate>
-            <UniformGrid Columns="2" />
-          </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <ui:Card Margin="0,0,8,8" Padding="16" VerticalAlignment="Stretch">
-              <StackPanel>
-                <RadioButton GroupName="choice" IsChecked="{Binding IsSelected}" FontSize="16" FontWeight="SemiBold" Content="{Binding Title}" />
-                <TextBlock Margin="28,8,0,0" Style="{StaticResource Secondary}">
-                  <Run Text="Saved " /><Run Text="{Binding When, Mode=OneWay}" />
-                </TextBlock>
-                <TextBlock Margin="28,2,0,0" Style="{StaticResource Secondary}" FontSize="12" Text="{Binding ClockNote}" />
-                <TextBlock Margin="28,8,0,0">
-                  <Run Text="{Binding Files, Mode=OneWay}" /><Run Text=" file(s), " /><Run Text="{Binding Size, Mode=OneWay}" />
-                </TextBlock>
-                <TextBlock Margin="28,8,0,0" Foreground="#D9821E" TextWrapping="Wrap" Text="{Binding Hint}"
-                           Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
-                <TextBlock Margin="28,8,0,0" Style="{StaticResource Secondary}" FontSize="12" Text="{Binding VersionId, StringFormat='Version {0}'}" />
-              </StackPanel>
-            </ui:Card>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+      <StackPanel Margin="24,0,24,0">
+        <ItemsControl x:Name="Candidates">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="2" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <ui:Card Margin="0,0,8,8" Padding="16" VerticalAlignment="Stretch">
+                <StackPanel>
+                  <RadioButton GroupName="choice" IsChecked="{Binding IsSelected}" FontSize="16" FontWeight="SemiBold" Content="{Binding Title}" />
+                  <TextBlock Margin="28,8,0,0" Style="{StaticResource Secondary}">
+                    <Run Text="Saved " /><Run Text="{Binding When, Mode=OneWay}" />
+                  </TextBlock>
+                  <TextBlock Margin="28,2,0,0" Style="{StaticResource Secondary}" FontSize="12" Text="{Binding ClockNote}" />
+                  <TextBlock Margin="28,8,0,0">
+                    <Run Text="{Binding Files, Mode=OneWay}" /><Run Text=" file(s), " /><Run Text="{Binding Size, Mode=OneWay}" />
+                  </TextBlock>
+                  <TextBlock Margin="28,8,0,0" Foreground="#D9821E" TextWrapping="Wrap" Text="{Binding Hint}"
+                             Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}" />
+                  <TextBlock Margin="28,8,0,0" Style="{StaticResource Secondary}" FontSize="12" Text="{Binding VersionId, StringFormat='Version {0}'}" />
+                </StackPanel>
+              </ui:Card>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel x:Name="GroupsPanel" Visibility="Collapsed">
+          <TextBlock Text="Saves changed on both PCs" Style="{StaticResource SectionTitle}" />
+          <TextBlock Style="{StaticResource Secondary}" FontSize="12"
+                     Text="Choosing a version above applies it to all of these; you can also choose per save. Saves changed on only one PC are merged automatically." />
+          <ItemsControl x:Name="Groups" Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="380" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding Options}" DisplayMemberPath="Label"
+                            SelectedValuePath="VersionId" SelectedValue="{Binding SelectedVersionId}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
     </ScrollViewer>
 
     <Grid Grid.Row="3" Margin="24,8,24,16">
@@ -56,10 +79,10 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <TextBlock Style="{StaticResource Secondary}" FontSize="12" VerticalAlignment="Center"
-                 Text="Both versions stay in the repository history: the other one can still be exported later." />
+                 Text="Every version stays in the repository history and can still be exported later." />
       <StackPanel Grid.Column="1" Orientation="Horizontal">
         <ui:Button Content="Decide later" Click="OnLater" Margin="8,0,8,0" />
-        <ui:Button x:Name="KeepButton" Content="Keep selected version" Appearance="Primary" Click="OnKeep" />
+        <ui:Button x:Name="KeepButton" Content="Keep selection" Appearance="Primary" Click="OnKeep" />
       </StackPanel>
     </Grid>
   </Grid>

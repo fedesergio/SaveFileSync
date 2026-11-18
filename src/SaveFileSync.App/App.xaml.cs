@@ -83,6 +83,12 @@ public partial class App : Application
 
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
+        if (cmd.SelfTestUi)
+        {
+            Dispatcher.BeginInvoke(async () => ExitWith(await UiSelfTest.RunAsync(_host)));
+            return;
+        }
+
         var listener = new Thread(ListenForShowSignal) { IsBackground = true, Name = "Show signal" };
         listener.Start();
 
@@ -116,6 +122,15 @@ public partial class App : Application
         }
 
         _main.Activate();
+    }
+
+    private void ExitWith(int code)
+    {
+        _exiting = true;
+        _tray?.Dispose();
+        _host?.Dispose();
+        ReleaseInstance();
+        Shutdown(code);
     }
 
     public void ExitApp()

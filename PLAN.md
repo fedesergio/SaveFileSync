@@ -1,6 +1,6 @@
 # SaveFileSync — Plan
 
-Status: **draft, awaiting approval** · Date: 2026-11-18
+Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`)
 
 SaveFileSync is a personal Windows tool that keeps game saves in sync across
 several PCs (Windows 11 desktop, ROG Xbox Ally X, future machines) using the
@@ -58,8 +58,10 @@ needs no admin rights and no Windows service.
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Generic Host** (`Microsoft.Extensions.Hosting`) provides DI, logging and
-  background services inside the WPF app.
+- A small hand-written composition root (`AppHost`) wires config, state,
+  repository, engine and service. The Generic Host was planned but is not used:
+  with a single background worker it added memory and startup cost for no benefit.
+  Logging uses `Microsoft.Extensions.Logging` abstractions backed by Serilog.
 - A **single-instance** named mutex keeps one engine per user. Launching the exe
   again only opens the main window of the running instance (via a named pipe).
 - **Background memory target:** under about 80 MB working set, with no window
@@ -93,8 +95,8 @@ tests/
 |---|---|
 | MVVM | CommunityToolkit.Mvvm |
 | Fluent styling | WPF-UI (lepoco/wpfui) |
-| Tray icon | H.NotifyIcon.Wpf |
-| Hosting/DI/logging | Microsoft.Extensions.* |
+| Tray icon | WinForms `NotifyIcon` (built into .NET; icons drawn at runtime) instead of H.NotifyIcon: one dependency less |
+| Logging abstractions | Microsoft.Extensions.Logging.Abstractions |
 | Log files | Serilog (rolling file sink) |
 | Local state | Microsoft.Data.Sqlite |
 | Manifest YAML | YamlDotNet |

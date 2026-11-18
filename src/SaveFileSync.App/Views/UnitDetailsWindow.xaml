@@ -78,6 +78,17 @@
         <TextBlock Text="Game process" Style="{StaticResource SectionTitle}" />
         <ui:TextBox x:Name="ProcessNames" PlaceholderText="e.g. rpcs3.exe; Ryujinx.exe" />
 
+        <TextBlock Text="Conflict detection" Style="{StaticResource SectionTitle}" />
+        <ComboBox x:Name="Granularity" />
+        <TextBlock x:Name="GranularityHint" Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0" />
+
+        <TextBlock Text="Backup" Style="{StaticResource SectionTitle}" />
+        <WrapPanel>
+          <ui:Button Content="Export latest version…" Icon="{ui:SymbolIcon ArrowExport24}" Click="OnExport" Margin="0,0,8,8" />
+        </WrapPanel>
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12"
+                   Text="Writes a copy of the latest synced saves to a folder of your choice. Older versions can be exported with 'SaveFileSync.exe export --version'." />
+
         <TextBlock Text="Sync" Style="{StaticResource SectionTitle}" />
         <WrapPanel>
           <ui:Button Content="Sync now" Icon="{ui:SymbolIcon ArrowSync24}" Click="OnSyncNow" Margin="0,0,8,8" />

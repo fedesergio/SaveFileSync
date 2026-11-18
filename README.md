@@ -8,13 +8,16 @@ emulators) in sync across several PCs, using OneDrive as the transport.
   downloads into a running game, and warns when a newer save arrived while the
   game was open (e.g. a handheld resumed from sleep).
 - Per-device conflict detection: when the same save changed on two PCs you
-  choose which version to keep, and both stay in the history.
+  choose which version to keep, and both stay in the history. With
+  "per save folder" detection (e.g. RPCS3), different saves changed on
+  different PCs are merged automatically.
 - Planned: automatic save-path detection via the
   [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest)
   (data from [PCGamingWiki](https://www.pcgamingwiki.com)), history browser,
   cover art, read-only Steam backups.
 
-**Status:** phase 1a (`v0.1.0`) — manual save folders, whole-game conflicts.
+**Status:** phase 1b (`v0.2.0`) — manual save folders; conflicts per game,
+per save folder or per file.
 See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
 
 **Stack:** .NET 10, WPF (WPF-UI), SQLite for local state.
@@ -24,7 +27,9 @@ See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
 1. Run `SaveFileSync.exe`. On first start choose a folder **inside OneDrive**
    (the same one on every PC) and a name for this PC.
 2. *Add game*: pick the save folder(s) and, ideally, the game's process
-   (e.g. `rpcs3.exe`) so nothing is copied while you play.
+   (e.g. `rpcs3.exe`) so nothing is copied while you play. For emulators that
+   keep one folder per game (RPCS3: `dev_hdd0\home\00000001\savedata`), choose
+   *Per save folder* conflict detection; keep *Whole game* for Ryujinx.
 3. On the other PCs the game appears as *Not set up on this PC*: open it, choose
    where its saves live on that PC, and *Set up on this PC*.
 
@@ -57,7 +62,8 @@ dotnet publish src/SaveFileSync.App -c Release -o publish   # single self-contai
 
 Dev only: `--profile <name>` keeps a separate config/state under
 `%LOCALAPPDATA%\SaveFileSync\profiles\<name>`, so two instances can simulate two
-PCs on one machine.
+PCs on one machine. `--selftest-ui` (with a configured profile) opens and closes
+every window and exits with 0 if they all load.
 
 ## Where data lives
 

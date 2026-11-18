@@ -21,6 +21,9 @@ public partial class AddUnitWindow : FluentWindow
         SystemThemeWatcher.Watch(this);
         Locations.ItemsSource = _locations;
         Warning.IsOpen = false;
+        Granularity.ItemsSource = GranularityOptions.Texts;
+        Granularity.SelectedIndex = 0;
+        GranularityHint.Text = GranularityOptions.Hint;
         Validate();
     }
 
@@ -163,7 +166,8 @@ public partial class AddUnitWindow : FluentWindow
                 GameName.Text.Trim(),
                 _locations.Select(l => l.ToDefinition()).ToList(),
                 LocationRow.Split(ProcessNames.Text),
-                _locations.ToDictionary(l => l.Id, l => l.Path));
+                _locations.ToDictionary(l => l.Id, l => l.Path),
+                GranularityOptions.At(Granularity.SelectedIndex));
             Close();
         }
         catch (Exception ex)

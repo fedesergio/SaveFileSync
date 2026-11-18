@@ -69,6 +69,10 @@
           <ComboBox x:Name="RunningApps" IsEditable="False" DropDownOpened="OnRunningAppsOpened" />
           <ui:Button Grid.Column="1" Content="Add running app" Margin="8,0,0,0" Click="OnAddRunningApp" />
         </Grid>
+
+        <TextBlock Text="Conflict detection" Style="{StaticResource SectionTitle}" />
+        <ComboBox x:Name="Granularity" />
+        <TextBlock x:Name="GranularityHint" Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0" />
       </StackPanel>
     </ScrollViewer>
 

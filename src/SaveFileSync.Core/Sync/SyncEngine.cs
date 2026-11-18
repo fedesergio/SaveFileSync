@@ -31,7 +31,15 @@ public enum SyncResultKind
     RepositoryUnavailable,
 }
 
-public sealed record ConflictInfo(ConflictReason Reason, IReadOnlyList<string> CandidateVersionIds, DateTime DetectedUtc);
+/// <param name="Groups">
+/// Conflicting groups (see <see cref="Merge.GroupOf"/>); empty or null means the whole unit.
+/// </param>
+public sealed record ConflictInfo(
+    ConflictReason Reason,
+    IReadOnlyList<string> CandidateVersionIds,
+    DateTime DetectedUtc,
+    IReadOnlyList<string>? Groups = null,
+    MergeGranularity Granularity = MergeGranularity.Unit);
 
 public sealed record SyncResult(SyncResultKind Kind, string? Message = null, VersionManifest? RemoteVersion = null)
 {
@@ -94,8 +102,9 @@ public sealed class SyncEngine
 
             var (graph, incomplete) = LoadGraph(unit.UnitId);
             var unitState = _state.GetUnitState(unit.UnitId);
-            var plan = Planner.Decide(unitState?.BaseVersionId, scan.Snapshot, graph);
-            _log.LogDebug("Unit {Unit}: plan {Plan}", unit.UnitId, plan);
+            var plan = Planner.Decide(unitState?.BaseVersionId, scan.Snapshot, graph, unit.Granularity);
+            _log.LogDebug("Unit {Unit}: plan {Plan} (base {Base}, {Files} local files, {Tips} tip(s))",
+                unit.UnitId, plan.GetType().Name, unitState?.BaseVersionId ?? "none", scan.Snapshot.Count, graph.Tips.Count);
 
             switch (plan)
             {
@@ -120,7 +129,7 @@ public sealed class SyncEngine
                         return SyncResult.Of(SyncResultKind.PushDeferred);
                     }
 
-                    if (!PushVersion(unit.UnitId, scan, push.Parents, push.Kind, note: null))
+                    if (!PushVersion(unit.UnitId, scan, Minimize(graph, push.Parents), push.Kind, note: null))
                     {
                         return SyncResult.Of(SyncResultKind.Unstable);
                     }
@@ -136,6 +145,22 @@ public sealed class SyncEngine
                     }
 
                     return Apply(unit, bindings, scan, target, force: false);
+
+                case SyncPlan.MergeApply mergeApply:
+                    if (!options.AllowApply || !options.AllowPush)
+                    {
+                        return new SyncResult(SyncResultKind.RemoteNewer, null, graph.Tips.LastOrDefault(t => t.VersionId != unitState?.BaseVersionId));
+                    }
+
+                    var mergeVersion = CreateVersion(
+                        unit.UnitId,
+                        Minimize(graph, mergeApply.Parents),
+                        VersionKind.Merge,
+                        mergeApply.Content.Files.ToList(),
+                        "Merged changes from several PCs");
+                    _state.PutCachedVersion(mergeVersion, complete: true);
+                    _log.LogInformation("Unit {Unit}: merged {Parents} into {Version}", unit.UnitId, string.Join(", ", mergeApply.Parents), mergeVersion.VersionId);
+                    return Apply(unit, bindings, scan, mergeVersion, force: false);
 
                 case SyncPlan.Conflict conflict:
                     if (conflict.PreserveLocalFirst)
@@ -155,7 +180,7 @@ public sealed class SyncEngine
                         continue;
                     }
 
-                    var info = new ConflictInfo(conflict.Reason, conflict.CandidateVersionIds, _clock.UtcNow);
+                    var info = new ConflictInfo(conflict.Reason, conflict.CandidateVersionIds, _clock.UtcNow, conflict.Groups, unit.Granularity);
                     _state.SaveUnitState(new UnitStateRecord(
                         unit.UnitId, unitState?.BaseVersionId, unitState?.LastSyncUtc, System.Text.Json.JsonSerializer.Serialize(info, Json.Options)));
                     _log.LogInformation("Unit {Unit}: conflict between {Candidates}", unit.UnitId, string.Join(", ", conflict.CandidateVersionIds));
@@ -182,11 +207,17 @@ public sealed class SyncEngine
     public DateTime? GetLastSyncUtc(string unitId) => _state.GetUnitState(unitId)?.LastSyncUtc;
 
     /// <summary>
-    /// Resolves a recorded conflict by keeping <paramref name="chosenVersionId"/>: creates a
+    /// Resolves a recorded conflict: each conflicting group is taken from the version chosen
+    /// for it in <paramref name="groupChoices"/> (default <paramref name="chosenVersionId"/>);
+    /// non-conflicting changes of every candidate are kept. Creates a
     /// <see cref="VersionKind.Resolve"/> version with the candidates as parents and applies it.
     /// The caller must make sure the game is not running.
     /// </summary>
-    public SyncResult Resolve(UnitDefinition unit, IReadOnlyDictionary<string, string> bindings, string chosenVersionId)
+    public SyncResult Resolve(
+        UnitDefinition unit,
+        IReadOnlyDictionary<string, string> bindings,
+        string chosenVersionId,
+        IReadOnlyDictionary<string, string>? groupChoices = null)
     {
         var conflict = GetConflict(unit.UnitId);
         if (conflict is null)
@@ -221,9 +252,13 @@ public sealed class SyncEngine
             return Sync(unit, bindings, SyncOptions.Full);
         }
 
+        var content = ResolvedContent(graph, conflict, candidates, chosen, groupChoices);
         var parents = Minimize(graph, candidates.Select(c => c.VersionId)
             .Concat(baseVersion is null ? [] : [baseVersion.VersionId]));
-        var resolved = CreateVersion(unit.UnitId, parents, VersionKind.Resolve, chosen.Files, $"Conflict resolved: kept {chosen.VersionId}");
+        var note = groupChoices is { Count: > 0 }
+            ? $"Conflict resolved per group (default {chosen.VersionId})"
+            : $"Conflict resolved: kept {chosen.VersionId}";
+        var resolved = CreateVersion(unit.UnitId, parents, VersionKind.Resolve, content.Files.ToList(), note);
         _state.PutCachedVersion(resolved, complete: true);
 
         if (scan.Snapshot.ContentEquals(resolved.Content))
@@ -234,6 +269,40 @@ public sealed class SyncEngine
 
         var applied = Apply(unit, bindings, scan, resolved, force: false);
         return applied.Kind == SyncResultKind.Pulled ? SyncResult.Of(SyncResultKind.Pushed) : applied;
+    }
+
+    /// <summary>
+    /// Content of a resolution: non-conflicting changes of all candidates merged, then each
+    /// conflicting group replaced by the files of the version chosen for it.
+    /// </summary>
+    private static Snapshot ResolvedContent(
+        VersionGraph graph,
+        ConflictInfo conflict,
+        IReadOnlyList<VersionManifest> candidates,
+        VersionManifest chosen,
+        IReadOnlyDictionary<string, string>? groupChoices)
+    {
+        var groups = conflict.Groups ?? [];
+        if (groups.Count == 0 || conflict.Granularity == MergeGranularity.Unit || candidates.Count == 0)
+        {
+            return chosen.Content;
+        }
+
+        var merged = candidates[0].Content;
+        var lineage = new List<string> { candidates[0].VersionId };
+        foreach (var candidate in candidates.Skip(1))
+        {
+            merged = Merge.WithGraph(graph, lineage, merged, candidate.VersionId, conflict.Granularity).Merged;
+            lineage.Add(candidate.VersionId);
+        }
+
+        foreach (var group in groups)
+        {
+            var source = groupChoices?.GetValueOrDefault(group) is { } id && graph.Get(id) is { } v ? v : chosen;
+            merged = Merge.ReplaceGroup(merged, source.Content, group, conflict.Granularity);
+        }
+
+        return merged;
     }
 
     /// <summary>"Restore from repository" after the local files disappeared: re-applies the base.</summary>

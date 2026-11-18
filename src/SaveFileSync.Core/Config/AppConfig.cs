@@ -28,6 +28,9 @@ public sealed class AppConfig
 
     public List<string> PausedUnits { get; set; } = [];
 
+    /// <summary>Folders where games are installed on this PC (used by automatic detection, phase 2).</summary>
+    public List<string> LibraryRoots { get; set; } = [];
+
     /// <summary>unitId → (locationId → absolute path on this PC).</summary>
     public Dictionary<string, Dictionary<string, string>> Bindings { get; set; } = new(StringComparer.Ordinal);
 

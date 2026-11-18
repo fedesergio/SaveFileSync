@@ -31,6 +31,8 @@
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <ui:Button Content="Add game" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Click="OnAddGame" Margin="0,0,8,0" />
         <ui:Button Content="Sync all now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncAllCommand}" Margin="0,0,8,0" />
+        <ui:Button Icon="{ui:SymbolIcon History24}" ToolTip="Activity" Click="OnActivity" Margin="0,0,8,0" />
+        <ui:Button Icon="{ui:SymbolIcon Settings24}" ToolTip="Settings" Click="OnSettings" Margin="0,0,8,0" />
         <ui:Button Command="{Binding TogglePauseCommand}" Icon="{ui:SymbolIcon Pause24}">
           <ui:Button.Style>
             <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">

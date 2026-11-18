@@ -41,18 +41,21 @@ public sealed class Harness : IDisposable
 
     public string RepoDir { get; }
 
-    public static UnitDefinition Unit(string unitId = "game-abc123", params string[] processNames) => new()
+    public static UnitDefinition Unit(string unitId = "game-abc123", MergeGranularity granularity = MergeGranularity.Unit, params string[] processNames) => new()
     {
         UnitId = unitId,
         Name = "Test Game",
         Locations = [new LocationDefinition { Id = "saves" }],
         ProcessNames = processNames,
+        Granularity = granularity,
     };
 
     /// <param name="clockOffset">Simulates a PC whose clock is wrong by this amount.</param>
-    public TestPc CreatePc(string name, TimeSpan clockOffset = default)
+    /// <param name="network">When set, this PC sees other PCs' writes only once the test delivers them.</param>
+    /// <param name="identity">Reuse another PC's identity (to simulate a cloned app data folder).</param>
+    public TestPc CreatePc(string name, TimeSpan clockOffset = default, LagNetwork? network = null, DeviceIdentity? identity = null)
     {
-        var pc = new TestPc(this, name, new DateTime(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc) + clockOffset);
+        var pc = new TestPc(this, name, new DateTime(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc) + clockOffset, network, identity);
         _pcs.Add(pc);
         return pc;
     }
@@ -78,16 +81,19 @@ public sealed class TestPc : IDisposable
 {
     private SyncService? _service;
 
-    internal TestPc(Harness harness, string name, DateTime start)
+    internal TestPc(Harness harness, string name, DateTime start, LagNetwork? network, DeviceIdentity? identity)
     {
         Name = name;
         var dir = Path.Combine(harness.Root, name);
         SavesDir = Path.Combine(dir, "saves");
         Directory.CreateDirectory(SavesDir);
         Clock = new FakeClock(start);
-        Remote = new FolderRemoteStore(harness.RepoDir);
+        Device = identity is null
+            ? DeviceIdentity.Create("fp-" + name)
+            : new DeviceIdentity { DeviceId = identity.DeviceId, ShortId = identity.ShortId, Fingerprint = "fp-" + name };
+        IRemoteStore folder = new FolderRemoteStore(harness.RepoDir);
+        Remote = network is null ? folder : new LaggyRemoteStore(folder, network, name);
         State = new SqliteLocalState(Path.Combine(dir, "state.db"));
-        Device = DeviceIdentity.Create("fp-" + name);
         Config = new ConfigStore(Path.Combine(dir, "config.json"));
         Config.Update(c =>
         {
@@ -105,7 +111,7 @@ public sealed class TestPc : IDisposable
 
     public FakeProcesses Processes { get; } = new();
 
-    public FolderRemoteStore Remote { get; }
+    public IRemoteStore Remote { get; }
 
     public SqliteLocalState State { get; }
 

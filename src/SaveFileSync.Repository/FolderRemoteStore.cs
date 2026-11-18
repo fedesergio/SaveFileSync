@@ -9,7 +9,7 @@ namespace SaveFileSync.Repository;
 /// Repository format v1 on a folder synced by the OneDrive client (PLAN.md §4).
 /// Every file has a single writer; every write is temp + rename; readers ignore temps.
 /// </summary>
-public sealed class FolderRemoteStore : IRemoteStore
+public sealed class FolderRemoteStore : IRemoteStore, IRepositoryDiagnostics
 {
     // FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS / FILE_ATTRIBUTE_RECALL_ON_OPEN (cloud files API).
     private const FileAttributes RecallOnDataAccess = (FileAttributes)0x00400000;
@@ -63,8 +63,45 @@ public sealed class FolderRemoteStore : IRemoteStore
     public void WriteDevice(DeviceInfo device, string deviceShort) =>
         AtomicFile.WriteAllBytes(Path.Combine(DevicesDir, device.DeviceId + ".json"), Json.Serialize(device), deviceShort);
 
+    /// <summary>
+    /// Files whose name does not match their content (e.g. OneDrive conflict copies such as
+    /// "&lt;id&gt;-DESKTOP.json") are ignored and counted in <see cref="IgnoredFiles"/>.
+    /// </summary>
     public IReadOnlyList<DeviceInfo> ReadDevices() =>
-        EnumerateJson(DevicesDir).Select(ReadJson<DeviceInfo>).OfType<DeviceInfo>().ToList();
+        EnumerateJson(DevicesDir)
+            .Select(f => (File: f, Device: ReadJson<DeviceInfo>(f)))
+            .Where(x => x.Device is not null && NameMatches(x.File, x.Device.DeviceId))
+            .Select(x => x.Device!)
+            .ToList();
+
+    /// <summary>Repository files ignored because they look like OneDrive conflict copies or foreign files.</summary>
+    public IReadOnlyList<string> FindIgnoredFiles()
+    {
+        var ignored = new List<string>();
+        ignored.AddRange(EnumerateJson(DevicesDir).Where(f => ReadJson<DeviceInfo>(f) is not { } d || !NameMatches(f, d.DeviceId)));
+        foreach (var unitId in ListUnitIds())
+        {
+            ignored.AddRange(EnumerateJson(Path.Combine(UnitsDir, unitId, "versions"))
+                .Where(f => !IsValidVersionId(Path.GetFileNameWithoutExtension(f))));
+            ignored.AddRange(EnumerateJson(Path.Combine(UnitsDir, unitId, "heads"))
+                .Where(f => ReadJson<HeadInfo>(f) is not { } h || !NameMatches(f, h.DeviceId)));
+        }
+
+        return ignored;
+    }
+
+    /// <summary>Version ids are "&lt;8 hex device short id&gt;-&lt;sequence, 6+ digits&gt;".</summary>
+    public static bool IsValidVersionId(string id)
+    {
+        var dash = id.IndexOf('-');
+        return dash == 8
+            && id[..8].All(Uri.IsHexDigit)
+            && id.Length >= 15
+            && id[9..].All(char.IsAsciiDigit);
+    }
+
+    private static bool NameMatches(string file, string id) =>
+        string.Equals(Path.GetFileNameWithoutExtension(file), id, StringComparison.OrdinalIgnoreCase);
 
     public IReadOnlyList<string> ListUnitIds() =>
         Directory.Exists(UnitsDir)
@@ -94,6 +131,7 @@ public sealed class FolderRemoteStore : IRemoteStore
         EnumerateJson(Path.Combine(UnitsDir, unitId, "versions"))
             .Select(Path.GetFileNameWithoutExtension)
             .OfType<string>()
+            .Where(IsValidVersionId)
             .Order(StringComparer.Ordinal)
             .ToList();
 
@@ -114,7 +152,11 @@ public sealed class FolderRemoteStore : IRemoteStore
         AtomicFile.WriteAllBytes(Path.Combine(UnitsDir, unitId, "heads", head.DeviceId + ".json"), Json.Serialize(head), deviceShort);
 
     public IReadOnlyList<HeadInfo> ReadHeads(string unitId) =>
-        EnumerateJson(Path.Combine(UnitsDir, unitId, "heads")).Select(ReadJson<HeadInfo>).OfType<HeadInfo>().ToList();
+        EnumerateJson(Path.Combine(UnitsDir, unitId, "heads"))
+            .Select(f => (File: f, Head: ReadJson<HeadInfo>(f)))
+            .Where(x => x.Head is not null && NameMatches(x.File, x.Head.DeviceId))
+            .Select(x => x.Head!)
+            .ToList();
 
     public BlobState GetBlobState(string sha256, long expectedSize)
     {

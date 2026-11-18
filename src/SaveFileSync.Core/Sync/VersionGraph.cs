@@ -89,6 +89,33 @@ public sealed class VersionGraph
             .FirstOrDefault();
     }
 
+    /// <summary>
+    /// The best common ancestors: common ancestors that are not ancestors of another common
+    /// ancestor. Usually one; several after "criss-cross" merges (e.g. the same conflict
+    /// resolved differently on two PCs).
+    /// </summary>
+    public IReadOnlyList<VersionManifest> MaximalCommonAncestors(IEnumerable<string> lineage, string versionId)
+    {
+        var common = AncestorsOrSelf(lineage);
+        common.IntersectWith(AncestorsOrSelf([versionId]));
+        var result = new List<VersionManifest>();
+        var covered = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var v in common.Select(id => _versions[id])
+                     .OrderByDescending(Generation)
+                     .ThenByDescending(v => v.VersionId, StringComparer.Ordinal))
+        {
+            if (covered.Contains(v.VersionId))
+            {
+                continue;
+            }
+
+            result.Add(v);
+            covered.UnionWith(AncestorsOrSelf([v.VersionId]));
+        }
+
+        return result;
+    }
+
     /// <summary>Length of the longest parent chain to a root present in the graph.</summary>
     public int Generation(VersionManifest version)
     {
