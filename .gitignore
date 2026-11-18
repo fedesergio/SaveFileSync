@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------
+# SaveFileSync — .gitignore (.NET 10 / WPF)
+# ---------------------------------------------------------------
+
+# --- Build output ---
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Pp]ublish/
+artifacts/
+*.binlog
+
+# --- Visual Studio / Rider / VS Code ---
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# --- Test & coverage ---
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+coverage/
+coverage*.json
+coverage*.xml
+*.coverage
+*.coveragexml
+
+# --- NuGet ---
+*.nupkg
+*.snupkg
+packages/
+!**/packages/build/
+project.lock.json
+
+# --- Logs & temp ---
+[Ll]ogs/
+*.log
+*.tmp
+*.temp
+
+# --- OS ---
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store
+
+# ---------------------------------------------------------------
+# Never commit: secrets, personal config, real saves, caches
+# (config and secrets live in %APPDATA% / %LOCALAPPDATA%, see PLAN.md)
+# ---------------------------------------------------------------
+.env
+.env.*
+secrets.json
+*.secrets.json
+*.local.json
+appsettings.*.local.json
+*.pfx
+*.p12
+
+# Local sandboxes used for manual testing (fake PCs, fake OneDrive)
+/sandbox/
+/.sandbox/
+
+# Downloaded Ludusavi manifest / metadata caches, if ever placed here by mistake
+manifest.yaml
+manifest.etag
+/cache/
+
+# Claude Code local settings
+.claude/settings.local.json
