@@ -111,6 +111,37 @@ public sealed class LaggyRemoteStore(IRemoteStore inner, LagNetwork network, str
         return inner.OpenBlob(sha256);
     }
 
+    // History data is not lagged here: lag scenarios target pushes; GC tests build their own timelines.
+    public IReadOnlyList<IdSetDocument> ReadPins(string unitId) => inner.ReadPins(unitId);
+
+    public void WritePins(string unitId, IdSetDocument document, string deviceShort) => inner.WritePins(unitId, document, deviceShort);
+
+    public IReadOnlyList<IdSetDocument> ReadArchive(string unitId) => inner.ReadArchive(unitId);
+
+    public void WriteArchive(string unitId, IdSetDocument document, string deviceShort) => inner.WriteArchive(unitId, document, deviceShort);
+
+    public IReadOnlyList<GcMarkDocument> ReadGcMarks() => inner.ReadGcMarks();
+
+    public void WriteGcMarks(GcMarkDocument document, string deviceShort) => inner.WriteGcMarks(document, deviceShort);
+
+    public IReadOnlyList<RetiredDevice> ReadRetired() => inner.ReadRetired();
+
+    public void WriteRetired(RetiredDevice document, string deviceShort) => inner.WriteRetired(document, deviceShort);
+
+    public VersionScan ScanVersions(string unitId)
+    {
+        var scan = inner.ScanVersions(unitId);
+        var visible = scan.Versions.Where(v => network.IsVisible(VersionKey(unitId, v.VersionId), device)).ToList();
+        return new VersionScan(visible, scan.Unreadable);
+    }
+
+    public int CountRecentTempFiles(TimeSpan maxAge, DateTime utcNow) => inner.CountRecentTempFiles(maxAge, utcNow);
+
+    public IReadOnlyList<BlobInfo> EnumerateBlobs() =>
+        inner.EnumerateBlobs().Where(b => network.IsVisible(BlobKey(b.Sha256), device)).ToList();
+
+    public bool DeleteBlob(string sha256) => inner.DeleteBlob(sha256);
+
     public IReadOnlyList<string> FindIgnoredFiles() =>
         inner is IRepositoryDiagnostics d ? d.FindIgnoredFiles() : [];
 

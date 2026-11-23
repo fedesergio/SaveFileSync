@@ -4,6 +4,36 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-11-24 — Phase 3
+
+### Added
+- **History** window per game: every version with the PC that saved it, status
+  (latest, on this PC, pinned, archived), and **Restore**, **Pin/Unpin**,
+  **Export** for any version.
+  - Restore first syncs the game (so nothing is lost), then puts the old saves on
+    top as a new version that every PC receives normally. It can be undone.
+- **Retention:** the latest N versions per game stay restorable (default 10,
+  shared by all PCs, configurable per game and as a default in Settings).
+  Older ones are **archived**.
+- **Cleanup** once a day (or *Settings → Clean up now*): unused files are first
+  marked, and deleted only after 14 days, only if still unused, and never while the
+  repository looks half-synced.
+- **Devices** window: active / inactive (90 days) / retired PCs, with *Retire*.
+  Inactive or retired PCs stop protecting their current version.
+- Automatic repair: a PC re-uploads files of its current version that vanished
+  from the repository.
+- `SaveFileSync.exe list` marks archived versions; `export` refuses them and
+  exports the latest version that is really available.
+- Tests: retention planner, restore, archived history and merges, far-behind
+  PC, pins, retired devices, cleanup safety (grace period, re-referenced files,
+  unreadable files, stale marks), repair, scheduled maintenance.
+
+### Changed
+- Old versions are **archived, not deleted**: removing a manifest would cut the
+  history chain and could invent conflicts (see PLAN.md D14).
+- Unit definitions can carry `keepVersions`; the repository gains `pins\`,
+  `archive\`, `gc\` and `retired\` folders (older repositories work unchanged).
+
 ## [0.3.0] — 2026-11-23 — Phase 2
 
 ### Added
@@ -82,6 +112,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   integration tests and the handheld-sleep scenario.
 - CI on GitHub Actions (build, tests, secret scan; release exe on tags).
 
+[0.4.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.4.0
 [0.3.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.3.0
 [0.2.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.1.0

@@ -28,6 +28,9 @@ public partial class MainWindow : FluentWindow
     private void OnActivity(object sender, RoutedEventArgs e) =>
         new ActivityWindow(_host) { Owner = this }.Show();
 
+    private void OnDevices(object sender, RoutedEventArgs e) =>
+        new DevicesWindow(_host) { Owner = this }.ShowDialog();
+
     private void OnSettings(object sender, RoutedEventArgs e) =>
         new SettingsWindow(_host) { Owner = this }.ShowDialog();
 

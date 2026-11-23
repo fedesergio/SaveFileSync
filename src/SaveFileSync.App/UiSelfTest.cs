@@ -49,10 +49,12 @@ internal static class UiSelfTest
             ("AddUnitWindow", () => new AddUnitWindow(host)),
             ("SettingsWindow", () => new SettingsWindow(host)),
             ("ActivityWindow", () => new ActivityWindow(host)),
+            ("DevicesWindow", () => new DevicesWindow(host)),
         };
         if (unitId is not null)
         {
             factories.Add(("UnitDetailsWindow", () => new UnitDetailsWindow(host, unitId)));
+            factories.Add(("HistoryWindow", () => new HistoryWindow(host, unitId)));
             factories.Add(("ConflictWindow", () => new ConflictWindow(host, unitId)));
         }
 
@@ -65,13 +67,16 @@ internal static class UiSelfTest
                 window.Show();
                 await Task.Delay(500);
 
-                if (window is AddUnitWindow add)
+                IReadOnlyList<string> problems = window switch
                 {
-                    foreach (var problem in await add.SelfTestAsync())
-                    {
-                        failures++;
-                        Console.WriteLine($"FAIL  {name}: {problem}");
-                    }
+                    AddUnitWindow add => await add.SelfTestAsync(),
+                    HistoryWindow history => await history.SelfTestAsync(),
+                    _ => [],
+                };
+                foreach (var problem in problems)
+                {
+                    failures++;
+                    Console.WriteLine($"FAIL  {name}: {problem}");
                 }
 
                 window.Close();

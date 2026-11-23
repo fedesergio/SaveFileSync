@@ -15,10 +15,12 @@ emulators) in sync across several PCs, using OneDrive as the transport.
   [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest)
   (data from [PCGamingWiki](https://www.pcgamingwiki.com)), with manual paths as
   a fallback, and presets for RPCS3 and Ryujinx.
-- Planned: history browser and restore, cover art, read-only Steam backups.
+- History browser: restore, pin and export any version, with a configurable
+  number of versions kept (older ones are archived and cleaned up carefully).
+- Planned: cover art, read-only Steam backups.
 
-**Status:** phase 2 (`v0.3.0`) — automatic save-folder detection, emulator
-presets, automatic setup on other PCs.
+**Status:** phase 3 (`v0.4.0`) — history and restore, retention, devices (on top
+of automatic detection and emulator presets from phase 2).
 See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
 
 **Stack:** .NET 10, WPF (WPF-UI), SQLite for local state, YamlDotNet.
@@ -42,6 +44,17 @@ See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
    as *Not set up on this PC*: open it and use *Find folders automatically* or
    *Browse…*. If saves already exist there and differ, you choose which version
    to keep: nothing is overwritten silently.
+
+## History and restore
+
+Every game has a **History** window (open the game, *History and restore…*): all
+saved versions with the PC that made them. *Restore…* puts an older version back
+on all your PCs (the one it replaces stays in the list, so you can undo it),
+*Pin* keeps a version, *Export…* writes it to a folder. To limit OneDrive space
+only the latest versions stay restorable (10 by default, per game); older ones
+are *archived* — still listed, but their files are removed, after a 14-day wait.
+**Settings** turns the daily cleanup off or runs it now. The **Devices** window
+lists your PCs; retire one you no longer use so its old versions can be cleaned.
 
 Some games also keep data in the Windows registry; that is **not synced** and
 the game is marked accordingly. The game database is the

@@ -90,10 +90,11 @@
 
         <TextBlock Text="Backup" Style="{StaticResource SectionTitle}" />
         <WrapPanel>
+          <ui:Button Content="History and restore…" Icon="{ui:SymbolIcon History24}" Click="OnHistory" Margin="0,0,8,8" />
           <ui:Button Content="Export latest version…" Icon="{ui:SymbolIcon ArrowExport24}" Click="OnExport" Margin="0,0,8,8" />
         </WrapPanel>
         <TextBlock Style="{StaticResource Secondary}" FontSize="12"
-                   Text="Writes a copy of the latest synced saves to a folder of your choice. Older versions can be exported with 'SaveFileSync.exe export --version'." />
+                   Text="History shows every saved version and lets you restore, pin or export any of them. Export writes a copy of the latest synced saves to a folder of your choice." />
 
         <TextBlock Text="Sync" Style="{StaticResource SectionTitle}" />
         <WrapPanel>

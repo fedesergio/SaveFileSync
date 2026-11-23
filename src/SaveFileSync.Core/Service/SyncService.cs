@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SaveFileSync.Core.Config;
+using SaveFileSync.Core.History;
 using SaveFileSync.Core.Model;
 using SaveFileSync.Core.Paths;
 using SaveFileSync.Core.Sync;
@@ -36,6 +37,8 @@ public sealed class SyncService : IDisposable
     ];
 
     private readonly ILocationResolver? _resolver;
+    private readonly HistoryService _history;
+    private DateTime _nextMaintenance = DateTime.MinValue;
     private readonly SyncEngine _engine;
     private readonly ConfigStore _config;
     private readonly DeviceIdentity _device;
@@ -74,6 +77,7 @@ public sealed class SyncService : IDisposable
     {
         _resolver = resolver;
         _engine = engine;
+        _history = new HistoryService(engine.Remote, engine, device, clock, log);
         _config = config;
         _device = device;
         _processes = processes;
@@ -200,6 +204,7 @@ public sealed class SyncService : IDisposable
                 ProcessNames = processNames.Select(NormalizeProcessName).Where(p => p.Length > 0).Distinct().ToList(),
                 Granularity = granularity,
                 Source = source,
+                KeepVersions = Math.Clamp(Config.DefaultKeepVersions, 1, 1000),
                 Revision = 1,
                 RevisionDevice = _device.ShortId,
                 UpdatedUtc = _clock.UtcNow,
@@ -310,6 +315,99 @@ public sealed class SyncService : IDisposable
 
     public Task<SyncResult> PropagateDeletionAsync(string unitId) =>
         RunUnitCommand(unitId, _engine.PropagateDeletion);
+
+    // ---------------------------------------------------------------- history (phase 3)
+
+    public Task<IReadOnlyList<HistoryEntry>> GetHistoryAsync(string unitId) => Invoke(() => _history.GetHistory(unitId));
+
+    public Task PinAsync(string unitId, string versionId, bool pinned) => Invoke(() =>
+    {
+        _history.SetPinned(unitId, versionId, pinned);
+        return true;
+    });
+
+    /// <summary>Restores an older version; every PC receives it as a normal change (PLAN.md §11, phase 3).</summary>
+    public Task<SyncResult> RestoreVersionAsync(string unitId, string versionId) =>
+        RunUnitCommand(unitId, (def, bindings) => _engine.RestoreVersion(def, bindings, versionId));
+
+    /// <summary>Changes how many versions stay restorable for a game; shared by all PCs.</summary>
+    public Task SetKeepVersionsAsync(string unitId, int keep) => Invoke(() =>
+    {
+        var current = _engine.Remote.ReadUnitDefinition(unitId) ?? throw new InvalidOperationException("Unknown game.");
+        _engine.Remote.WriteUnitDefinition(
+            current.Revised(_device.ShortId, _clock.UtcNow, keepVersions: Math.Clamp(keep, 1, 1000)),
+            _device.ShortId);
+        RefreshUnits();
+        return true;
+    });
+
+    public Task<IReadOnlyList<DeviceRow>> GetDevicesAsync() => Invoke(() => _history.GetDevices());
+
+    public Task RetireDeviceAsync(string deviceId) => Invoke(() =>
+    {
+        _history.RetireDevice(deviceId);
+        AddActivity("Devices", ActivityKind.Info, $"Retired {DeviceName(deviceId)}");
+        return true;
+    });
+
+    /// <summary>
+    /// Archives versions beyond each game's limit, deletes contents nobody needs any more (after the
+    /// grace period) and repairs blobs that went missing. Also runs once a day by itself.
+    /// </summary>
+    public Task<MaintenanceReport> RunMaintenanceAsync() => Invoke(() => RunMaintenance(_clock.UtcNow));
+
+    internal MaintenanceReport RunMaintenance(DateTime now)
+    {
+        _nextMaintenance = now + TimeSpan.FromHours(24);
+        var archived = 0;
+        var repaired = 0;
+        foreach (var rt in _units.Values.ToList())
+        {
+            try
+            {
+                if (rt.IsBound && !rt.Busy)
+                {
+                    repaired += _engine.RepairMissingBlobs(rt.Definition, rt.Bindings);
+                }
+
+                var count = _history.ApplyRetention(rt.Definition);
+                if (count > 0)
+                {
+                    archived += count;
+                    AddActivity(rt.Definition.Name, ActivityKind.Info, $"Archived {count} old version(s); the latest {rt.Definition.EffectiveKeepVersions} stay restorable");
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _log.LogWarning(ex, "Unit {Unit}: history cleanup failed", rt.UnitId);
+            }
+        }
+
+        GcReport gc;
+        try
+        {
+            gc = BlobGarbageCollector.Run(_engine.Remote, _device.DeviceId, _device.ShortId, now, log: _log);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogWarning(ex, "Blob cleanup failed");
+            gc = GcReport.Skipped(ex.Message);
+        }
+
+        if (gc.Deleted > 0)
+        {
+            AddActivity("Repository", ActivityKind.Info, $"Cleanup freed {gc.Deleted} unused file(s), {FormatBytes(gc.DeletedBytes)}");
+        }
+
+        return new MaintenanceReport(archived, repaired, gc);
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / 1024.0 / 1024:0.#} MB",
+        _ => $"{bytes / 1024.0 / 1024 / 1024:0.##} GB",
+    };
 
     /// <summary>The candidate versions of a unit's recorded conflict.</summary>
     public Task<IReadOnlyList<VersionManifest>> GetConflictCandidatesAsync(string unitId) => Invoke(() =>
@@ -467,6 +565,16 @@ public sealed class SyncService : IDisposable
         }
 
         Publish(_units.Values.Select(rt => rt.LastStatus(this)).ToList());
+
+        // Once a day, first 10 minutes after start so a fresh start never cleans a half-synced repository.
+        if (_nextMaintenance == DateTime.MinValue)
+        {
+            _nextMaintenance = now + TimeSpan.FromMinutes(10);
+        }
+        else if (now >= _nextMaintenance && config.HistoryCleanup && !globalPause)
+        {
+            RunMaintenance(now);
+        }
     }
 
     /// <summary>Marks a unit's local files as changed (used when watchers are disabled, e.g. in tests).</summary>
@@ -764,7 +872,11 @@ public sealed class SyncService : IDisposable
                 break;
             case SyncResultKind.Pulled:
                 var v = result.RemoteVersion;
-                if (v is { Kind: VersionKind.Merge } && v.DeviceId == _device.DeviceId)
+                if (v is { Kind: VersionKind.Restore } && v.DeviceId == _device.DeviceId)
+                {
+                    AddActivity(name, ActivityKind.Resolved, "Restored an earlier version on all PCs");
+                }
+                else if (v is { Kind: VersionKind.Merge } && v.DeviceId == _device.DeviceId)
                 {
                     AddActivity(name, ActivityKind.Merged, "Merged changes made on several PCs");
                 }

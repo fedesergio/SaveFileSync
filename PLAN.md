@@ -1,6 +1,6 @@
 # SaveFileSync — Plan
 
-Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`)
+Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`), phase 3 (`v0.4.0`)
 
 SaveFileSync is a personal Windows tool that keeps game saves in sync across
 several PCs (Windows 11 desktop, ROG Xbox Ally X, future machines) using the
@@ -27,6 +27,7 @@ covers them); a read-only Steam *backup* is a later phase.
 | D11 | Phasing | Phase 1 is split in two. **1a:** `unit` granularity only, essential GUI. **1b:** folder/file merge, full wizard, Activity screen, full simulation harness. |
 | D12 | Recovery | Saves can be recovered without the sync engine from phase 1a: a read-only `export` CLI, a `README.txt` in the repository, and a documented format (§4.1). |
 | D13 | Handheld sleep | A "newer save available — close the game" notice when a running game's save is outdated, also after resume from sleep (§6.6). |
+| D14 | Old versions | **Archive, never delete manifests**: archived versions keep the history connected for merges; only their files are cleaned up, in two steps with a 14-day wait (§11, phase 3). |
 
 ---
 
@@ -164,6 +165,14 @@ SaveFileSync\
         <devShort>-<seq:000000>.json     # immutable version manifests (writer: creating device)
       heads\
         <deviceId>.json                  # { versionId, updatedUtc }: device's current base (writer: that device)
+      pins\
+        <deviceId>.json                  # versions this device pinned (phase 3)
+      archive\
+        <deviceId>.json                  # versions whose files were removed on purpose (phase 3)
+  gc\
+    <deviceId>.json                      # blobs this device found unused, and since when (phase 3)
+  retired\
+    <deviceId>.json                      # written by the PC that retired it (phase 3)
   blobs\
     <sha256[0..2]>\<sha256>              # content-addressed file contents, immutable
 ```
@@ -668,7 +677,9 @@ switched off in *Settings*. Games installed under a library root (e.g.
 | OneDrive conflict copy found in the repository | Should not happen (single writer). If it does: <br>• `heads`/`devices` copies → removed and logged; <br>• anything else → logged, and listed in the diagnostics |
 | Two PCs with the same `deviceId` (cloned profile/image) | Detected through the fingerprint in `devices/<id>.json`. That device stops syncing and asks to regenerate its identity |
 | Game file locked / changing during push | Abort without side effects; back to Dirty |
-| Crash or power loss during push | Orphan blobs are removed later by GC; nothing points to them |
+| Crash or power loss during push | Orphan blobs are removed later by the cleanup, after the 14-day grace period; nothing points to them |
+| Blob of this PC's current version vanished from the repository (cleaned while offline) | `RepairMissingBlobs` uploads it again from the local files; other PCs then complete the version |
+| Cleanup finds an unreadable version file or a write in progress | The whole cleanup is skipped and retried the next day |
 | Crash or power loss during pull | The apply journal resumes or rolls back at startup (§6.3) |
 | Access denied (Controlled Folder Access, permissions) | Unit goes to Error with an explanation of the specific cause |
 | Disk full (local or OneDrive quota) | Unit goes to Error; retries back off up to 1 h; tray attention icon |
@@ -851,18 +862,54 @@ assumptions.
 
 ### Phase 3 — History & restore → `v0.4.0` (MVP+ part 1)
 
-- History tab, *Restore*, *Pin*, and *Export to folder* for any version (the
-  CLI already exports any version since 1a).
-  - *Restore* creates a `restore` version on top of the current tip, so every
-    PC receives it as a normal change after a confirmation.
-- Retention: keep N (default 10) per unit, plus pinned versions, plus any
-  version that is a head of a device seen in the last 90 days.
-  - A device prunes its own version files.
-  - Versions from devices retired or unseen for more than 90 days can be pruned
-    by any device.
-- Blob GC: remove unreferenced blobs older than 14 days. The grace period
-  protects pushes still in flight.
-- Devices screen with *Retire*.
+**Implemented.** A *History* window per game (restore, pin, export, versions to
+keep), a *Devices* window (retire), and a daily cleanup.
+
+- **Restore** brings the game in sync first (so what is replaced is already in
+  the repository), then creates a `restore` version on top of the single current
+  tip and applies it. Other PCs receive it like any change. It is refused during
+  a conflict, while the game runs, when another PC has unmerged changes, or for
+  an archived version. The replaced version stays in the list, so a restore can
+  be undone.
+- **Pin** keeps a version restorable. Pins are per device (one writer per file);
+  a pin made on another PC can only be removed there.
+- **Retention (archive, not delete).** Keep the newest N restorable versions
+  (default 10, per game, stored in the game's definition so all PCs agree),
+  plus every tip, pinned version, and the current version of each device seen
+  in the last 90 days. The others are **archived**: their manifest stays, their
+  files may be removed.
+  - **Why not delete the manifests, as first planned.** Versions point to their
+    parents. Deleting a manifest in the middle cuts the chain: the merge of two
+    PCs would lose its common base and invent conflicts, and an old kept version
+    would look like a "tip" and be applied on other PCs. Archived versions keep
+    the history intact; they only stop being restorable. Manifests are a few KB
+    each (O10 covers compaction if they ever matter).
+  - A PC archives its own versions and those of inactive or retired devices.
+  - Order comes from the history graph, never from device clocks.
+- **Cleanup of files (blobs)**, once a day, 10 minutes after start at the
+  earliest, never on a half-synced repository:
+  1. Do nothing if any version file cannot be read, or if something is being
+     written (temporary files younger than 2 days).
+  2. A blob not referenced by any non-archived version is only **marked**.
+  3. It is deleted only if this PC's own mark is at least **14 days** old, a
+     fresh look still finds it unreferenced, and the file itself is older than
+     14 days. Marks are per device and dropped as soon as the blob is referenced
+     again, so an old mark can never make a later deletion instant.
+  4. **Residual risk, and its repair:** a PC offline for more than 14 days that
+     reused an old blob in a new version could find that blob gone. That PC
+     detects missing blobs of its current version and uploads them again from
+     its local files (`RepairMissingBlobs`), so the version completes.
+- **Devices.** Active (seen in 90 days), inactive, retired. *Retire* writes
+  `retired/<id>.json`; a retired PC that starts again re-registers (newer
+  `lastSeen`) and is active again. Retired or inactive devices stop protecting
+  their current version.
+- **Settings:** versions to keep for new games, daily cleanup on/off, *Clean up
+  now*. The recovery CLI knows archived versions (`list` marks them; `export`
+  refuses them, and exports the latest version that is really available).
+
+Tests include mutation-style checks (the "device far behind" scenario fails if
+heads stop being protected) and GC safety scenarios (grace period, re-referenced
+blobs, unreadable files, stale marks).
 
 ### Phase 4 — Metadata → `v0.5.0` (MVP+ part 2)
 
@@ -1010,3 +1057,6 @@ issues.
 - **O8** An optional launch wrapper ("Launch via SaveFileSync") for a strict
   pull before launch. It is not planned, given D3.
 - **O9** An optional Graph `IRemoteStore` for PCs without the OneDrive client.
+- **O10** Version manifests of archived versions are never removed (D14). After
+  years of use they could be compacted into a checkpoint; not needed until the
+  numbers show it.

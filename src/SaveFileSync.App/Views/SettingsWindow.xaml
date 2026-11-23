@@ -61,6 +61,22 @@
         <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="28,2,0,0"
                    Text="Only when the folder is found in exactly one place. If saves already exist here and differ, you are asked which version to keep: nothing is overwritten silently." />
 
+        <TextBlock Text="History" Style="{StaticResource SectionTitle}" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="140" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Versions to keep restorable (for games added from this PC)" VerticalAlignment="Center" />
+          <ui:NumberBox x:Name="DefaultKeep" Grid.Column="1" Minimum="1" Maximum="1000" SmallChange="1" />
+        </Grid>
+        <CheckBox x:Name="HistoryCleanup" Margin="0,12,0,0"
+                  Content="Clean up old versions once a day" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="28,2,0,0"
+                   Text="Versions beyond the limit are archived (listed, but their files are removed after a 14-day wait). Each game can have its own limit in its History window." />
+        <ui:Button x:Name="CleanNow" Content="Clean up now" Icon="{ui:SymbolIcon Broom24}" Click="OnCleanNow" Margin="0,8,0,0" />
+        <TextBlock x:Name="CleanResult" Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0" />
+
         <TextBlock Text="Game database" Style="{StaticResource SectionTitle}" />
         <TextBlock x:Name="DatabaseStatus" Style="{StaticResource Secondary}" />
         <ProgressBar x:Name="DatabaseProgress" IsIndeterminate="True" Height="3" Margin="0,6,0,0" Visibility="Collapsed" />

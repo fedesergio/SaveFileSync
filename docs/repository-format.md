@@ -15,6 +15,10 @@ The repository is a folder inside OneDrive that SaveFileSync manages
     def\<revision>-<devShort>.json       unit definition; highest revision wins
     versions\<devShort>-<seq>.json       immutable version manifests
     heads\<deviceId>.json                version each PC currently has
+    pins\<deviceId>.json                 versions that PC pinned (kept restorable)
+    archive\<deviceId>.json              versions whose files were removed on purpose
+  gc\<deviceId>.json                     blobs a PC found unused, and since when
+  retired\<deviceId>.json                PCs retired by the user
   blobs\<sha[0..2]>\<sha256>             file contents, named by SHA-256 (lowercase hex)
 ```
 
@@ -87,6 +91,19 @@ absolute paths and no user names.
 - `createdUtc` comes from the clock of the PC that created the version and is
   informational only.
 - A version is complete only when every blob it lists exists.
+- `kind` is `normal`, `merge`, `resolve` (a conflict choice), `restore` (an older
+  version put back on top) or `initial`.
+
+## Old versions: archived, not deleted
+
+To limit OneDrive space, versions beyond a game's limit (`keepVersions` in the
+definition, default 10) are **archived**: the id is listed in
+`units\<id>\archive\<deviceId>.json` (`{"versionIds": [...]}`), the manifest stays
+(so the history stays connected), and the files may later be deleted from
+`blobs\` by the cleanup (first marked in `gc\`, deleted at least 14 days later
+and only if no restorable version uses them). An archived version cannot be
+restored or exported; the latest version, pinned versions and each PC's current
+version are never archived. `SaveFileSync.exe list` marks them `ARCHIVED`.
 
 ## Recovering a version by hand (last resort)
 

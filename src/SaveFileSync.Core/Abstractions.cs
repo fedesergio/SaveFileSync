@@ -75,7 +75,43 @@ public interface IRemoteStore
     void PutBlob(string sha256, long size, Func<Stream> openSource, string deviceShort);
 
     Stream OpenBlob(string sha256);
+
+    // ---- history (phase 3): pins, archive, cleanup, retired devices ----
+
+    IReadOnlyList<IdSetDocument> ReadPins(string unitId);
+
+    void WritePins(string unitId, IdSetDocument document, string deviceShort);
+
+    /// <summary>Versions whose contents were intentionally removed; their manifests stay so history keeps its shape.</summary>
+    IReadOnlyList<IdSetDocument> ReadArchive(string unitId);
+
+    void WriteArchive(string unitId, IdSetDocument document, string deviceShort);
+
+    IReadOnlyList<GcMarkDocument> ReadGcMarks();
+
+    void WriteGcMarks(GcMarkDocument document, string deviceShort);
+
+    IReadOnlyList<RetiredDevice> ReadRetired();
+
+    void WriteRetired(RetiredDevice document, string deviceShort);
+
+    /// <summary>Every version manifest of a unit, complete or not, and how many could not be read.</summary>
+    VersionScan ScanVersions(string unitId);
+
+    /// <summary>Temporary files (writes in progress somewhere in the repository) younger than <paramref name="maxAge"/>.</summary>
+    int CountRecentTempFiles(TimeSpan maxAge, DateTime utcNow);
+
+    IReadOnlyList<BlobInfo> EnumerateBlobs();
+
+    /// <summary>Deletes a blob; false if it was not there.</summary>
+    bool DeleteBlob(string sha256);
 }
+
+public sealed record BlobInfo(string Sha256, long Size, DateTime LastWriteUtc);
+
+/// <param name="Versions">Manifests that could be read.</param>
+/// <param name="Unreadable">Version files with a valid name that could not be parsed (maybe still syncing).</param>
+public sealed record VersionScan(IReadOnlyList<VersionManifest> Versions, int Unreadable);
 
 /// <summary>Optional diagnostics offered by a repository implementation.</summary>
 public interface IRepositoryDiagnostics

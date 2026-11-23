@@ -1,0 +1,45 @@
+<ui:FluentWindow x:Class="SaveFileSync.App.Views.DevicesWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Devices"
+                 Width="780" Height="480"
+                 WindowStartupLocation="CenterOwner"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <ui:TitleBar Title="Devices" ShowMaximize="False" ShowMinimize="False" />
+
+    <StackPanel Grid.Row="1" Margin="24,0,24,8">
+      <TextBlock Text="Devices" FontSize="22" FontWeight="SemiBold" />
+      <TextBlock Style="{StaticResource Secondary}" Margin="0,4,0,0"
+                 Text="The PCs that use this repository. A PC not seen for 90 days is inactive; a PC you no longer use can be retired right away. Either way, its old versions can then be cleaned up. A retired PC that starts SaveFileSync again simply comes back." />
+    </StackPanel>
+
+    <ListView x:Name="DeviceList" Grid.Row="2" Margin="24,0,24,8" SelectionChanged="OnSelectionChanged" SelectionMode="Single">
+      <ListView.View>
+        <GridView>
+          <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}" />
+          <GridViewColumn Header="Status" Width="120" DisplayMemberBinding="{Binding Status}" />
+          <GridViewColumn Header="Last seen" Width="170" DisplayMemberBinding="{Binding LastSeen}" />
+          <GridViewColumn Header="App version" Width="140" DisplayMemberBinding="{Binding AppVersion}" />
+        </GridView>
+      </ListView.View>
+    </ListView>
+
+    <Grid Grid.Row="3" Margin="24,0,24,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock x:Name="Message" Style="{StaticResource Secondary}" VerticalAlignment="Center" />
+      <ui:Button x:Name="RetireButton" Grid.Column="1" Content="Retire…" Click="OnRetire" />
+    </Grid>
+  </Grid>
+</ui:FluentWindow>

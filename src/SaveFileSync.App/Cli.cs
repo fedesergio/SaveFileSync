@@ -61,7 +61,8 @@ public static class Cli
             Console.WriteLine($"{unit.Name}  [{unit.UnitId}]{(unit.Removed ? "  (removed)" : "")}");
             foreach (var v in unit.Versions)
             {
-                var flags = (v.IsTip ? " latest" : "") + (v.IsComplete ? "" : " INCOMPLETE");
+                var flags = (v.IsTip ? " latest" : "")
+                            + (v.IsArchived ? " ARCHIVED (files removed)" : v.IsComplete ? "" : " INCOMPLETE");
                 Console.WriteLine($"    {v.VersionId}  {v.CreatedUtc.ToLocalTime():yyyy-MM-dd HH:mm}  {v.DeviceName,-16} {v.FileCount,4} files {FormatSize(v.TotalSize),10}  {v.Kind}{flags}");
             }
 

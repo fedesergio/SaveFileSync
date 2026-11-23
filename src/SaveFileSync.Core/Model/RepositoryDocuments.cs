@@ -30,6 +30,47 @@ public sealed class DeviceInfo
     public DateTime LastSeenUtc { get; init; }
 }
 
+/// <summary>
+/// A set of version ids written by one device: pins (<c>units/&lt;id&gt;/pins/&lt;deviceId&gt;.json</c>) or
+/// archived versions (<c>units/&lt;id&gt;/archive/&lt;deviceId&gt;.json</c>). Each device writes only its
+/// own file; readers use the union of all files (PLAN.md §4, "one writer per file").
+/// </summary>
+public sealed class IdSetDocument
+{
+    public required string DeviceId { get; init; }
+
+    public IReadOnlyList<string> VersionIds { get; init; } = [];
+
+    public DateTime UpdatedUtc { get; init; }
+}
+
+/// <summary>
+/// Blobs that a device found unreferenced (<c>gc/&lt;deviceId&gt;.json</c>) and when. A blob is
+/// deleted only long after it was first marked and only if it is still unreferenced.
+/// </summary>
+public sealed class GcMarkDocument
+{
+    public required string DeviceId { get; init; }
+
+    /// <summary>sha256 → time it was first seen unreferenced by this device.</summary>
+    public IReadOnlyDictionary<string, DateTime> Marks { get; init; } = new Dictionary<string, DateTime>();
+
+    public DateTime UpdatedUtc { get; init; }
+}
+
+/// <summary>
+/// <c>retired/&lt;deviceId&gt;.json</c>, written by the PC that retired it. The device counts as retired
+/// until it shows up again (its <c>lastSeenUtc</c> becomes newer than <see cref="RetiredUtc"/>).
+/// </summary>
+public sealed class RetiredDevice
+{
+    public required string DeviceId { get; init; }
+
+    public DateTime RetiredUtc { get; init; }
+
+    public string? RetiredByDeviceId { get; init; }
+}
+
 /// <summary><c>units/&lt;unitId&gt;/heads/&lt;deviceId&gt;.json</c>: the device's current base.</summary>
 public sealed class HeadInfo
 {
@@ -114,6 +155,13 @@ public sealed class UnitDefinition
 
     public UnitSource? Source { get; init; }
 
+    /// <summary>How many versions stay restorable; null means <see cref="DefaultKeepVersions"/>. Shared by all PCs.</summary>
+    public int? KeepVersions { get; init; }
+
+    public const int DefaultKeepVersions = 10;
+
+    public int EffectiveKeepVersions => Math.Clamp(KeepVersions ?? DefaultKeepVersions, 1, 1000);
+
     /// <summary>A copy with the next revision number; only the given fields change.</summary>
     public UnitDefinition Revised(
         string deviceShortId,
@@ -123,8 +171,10 @@ public sealed class UnitDefinition
         IReadOnlyList<string>? processNames = null,
         MergeGranularity? granularity = null,
         bool? removed = null,
-        UnitSource? source = null) => new()
+        UnitSource? source = null,
+        int? keepVersions = null) => new()
     {
+        KeepVersions = keepVersions ?? KeepVersions,
         UnitId = UnitId,
         Name = name ?? Name,
         Locations = locations ?? Locations,

@@ -220,6 +220,123 @@ public sealed class FolderRemoteStore : IRemoteStore, IRepositoryDiagnostics
     public Stream OpenBlob(string sha256) =>
         new FileStream(BlobPath(sha256), FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.SequentialScan);
 
+    // ---------------------------------------------------------------- history (phase 3)
+
+    public IReadOnlyList<IdSetDocument> ReadPins(string unitId) => ReadIdSets(Path.Combine(UnitsDir, unitId, "pins"));
+
+    public void WritePins(string unitId, IdSetDocument document, string deviceShort) =>
+        AtomicFile.WriteAllBytes(Path.Combine(UnitsDir, unitId, "pins", document.DeviceId + ".json"), Json.Serialize(document), deviceShort);
+
+    public IReadOnlyList<IdSetDocument> ReadArchive(string unitId) => ReadIdSets(Path.Combine(UnitsDir, unitId, "archive"));
+
+    public void WriteArchive(string unitId, IdSetDocument document, string deviceShort) =>
+        AtomicFile.WriteAllBytes(Path.Combine(UnitsDir, unitId, "archive", document.DeviceId + ".json"), Json.Serialize(document), deviceShort);
+
+    public IReadOnlyList<GcMarkDocument> ReadGcMarks() =>
+        EnumerateJson(Path.Combine(Root, "gc"))
+            .Select(f => (File: f, Doc: ReadJson<GcMarkDocument>(f)))
+            .Where(x => x.Doc is not null && NameMatches(x.File, x.Doc.DeviceId))
+            .Select(x => x.Doc!)
+            .ToList();
+
+    public void WriteGcMarks(GcMarkDocument document, string deviceShort) =>
+        AtomicFile.WriteAllBytes(Path.Combine(Root, "gc", document.DeviceId + ".json"), Json.Serialize(document), deviceShort);
+
+    public IReadOnlyList<RetiredDevice> ReadRetired() =>
+        EnumerateJson(Path.Combine(Root, "retired"))
+            .Select(f => (File: f, Doc: ReadJson<RetiredDevice>(f)))
+            .Where(x => x.Doc is not null && NameMatches(x.File, x.Doc.DeviceId))
+            .Select(x => x.Doc!)
+            .ToList();
+
+    public void WriteRetired(RetiredDevice document, string deviceShort) =>
+        AtomicFile.WriteAllBytes(Path.Combine(Root, "retired", document.DeviceId + ".json"), Json.Serialize(document), deviceShort);
+
+    public VersionScan ScanVersions(string unitId)
+    {
+        var versions = new List<VersionManifest>();
+        var unreadable = 0;
+        foreach (var id in ListVersionIds(unitId))
+        {
+            // A valid name that cannot be parsed or does not match its content may still be arriving.
+            var version = ReadVersion(unitId, id);
+            if (version is null)
+            {
+                unreadable++;
+            }
+            else
+            {
+                versions.Add(version);
+            }
+        }
+
+        return new VersionScan(versions, unreadable);
+    }
+
+    public int CountRecentTempFiles(TimeSpan maxAge, DateTime utcNow)
+    {
+        if (!Directory.Exists(Root))
+        {
+            return 0;
+        }
+
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = 0 };
+        return Directory.EnumerateFiles(Root, "*" + AtomicFile.TempMarker + "*", options)
+            .Count(f => utcNow - File.GetLastWriteTimeUtc(f) < maxAge);
+    }
+
+    public IReadOnlyList<BlobInfo> EnumerateBlobs()
+    {
+        if (!Directory.Exists(BlobsDir))
+        {
+            return [];
+        }
+
+        var result = new List<BlobInfo>();
+        foreach (var file in new DirectoryInfo(BlobsDir).EnumerateFiles("*", SearchOption.AllDirectories))
+        {
+            if (file.Name.Length == 64 && file.Name.All(Uri.IsHexDigit) && !AtomicFile.IsTempName(file.Name))
+            {
+                result.Add(new BlobInfo(file.Name.ToLowerInvariant(), file.Length, file.LastWriteTimeUtc));
+            }
+        }
+
+        return result;
+    }
+
+    public bool DeleteBlob(string sha256)
+    {
+        var path = BlobPath(sha256);
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        File.SetAttributes(path, FileAttributes.Normal);
+        File.Delete(path);
+        var folder = Path.GetDirectoryName(path)!;
+        if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any())
+        {
+            try
+            {
+                Directory.Delete(folder);
+            }
+            catch (IOException)
+            {
+                // Another file arrived at the same time: leave the folder.
+            }
+        }
+
+        return true;
+    }
+
+    private IReadOnlyList<IdSetDocument> ReadIdSets(string dir) =>
+        EnumerateJson(dir)
+            .Select(f => (File: f, Doc: ReadJson<IdSetDocument>(f)))
+            .Where(x => x.Doc is not null && NameMatches(x.File, x.Doc.DeviceId))
+            .Select(x => x.Doc!)
+            .ToList();
+
     private string VersionPath(string unitId, string versionId) => Path.Combine(UnitsDir, unitId, "versions", versionId + ".json");
 
     private string BlobPath(string sha256)

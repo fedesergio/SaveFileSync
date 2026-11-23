@@ -230,6 +230,11 @@ public partial class UnitDetailsWindow : FluentWindow
         }
     }
 
+    private void OnHistory(object sender, RoutedEventArgs e)
+    {
+        new HistoryWindow(_host, _unitId) { Owner = this }.ShowDialog();
+    }
+
     private async void OnExport(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFolderDialog { Title = $"Export the latest saves of {_definition.Name} to…" };

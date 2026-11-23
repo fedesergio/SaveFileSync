@@ -126,6 +126,31 @@ public sealed class TestPc : IDisposable
 
     public IReadOnlyDictionary<string, string> Bindings => new Dictionary<string, string> { ["saves"] = SavesDir };
 
+    private SaveFileSync.Core.History.HistoryService? _history;
+
+    public SaveFileSync.Core.History.HistoryService History =>
+        _history ??= new SaveFileSync.Core.History.HistoryService(Remote, Engine, Device, Clock);
+
+    /// <summary>Registers this PC in the repository, as the service does at startup.</summary>
+    public void Register(DateTime? lastSeen = null) =>
+        Remote.WriteDevice(
+            new DeviceInfo
+            {
+                DeviceId = Device.DeviceId,
+                ShortId = Device.ShortId,
+                Name = Name,
+                Fingerprint = Device.Fingerprint,
+                LastSeenUtc = lastSeen ?? Clock.UtcNow,
+            },
+            Device.ShortId);
+
+    /// <summary>Writes a file and syncs: one new version per call.</summary>
+    public SyncResult Save(UnitDefinition unit, string relativePath, string content)
+    {
+        Write(relativePath, content);
+        return Sync(unit);
+    }
+
     /// <summary>Set before the service is first used, to simulate automatic setup on this PC.</summary>
     public ILocationResolver? Resolver { get; set; }
 

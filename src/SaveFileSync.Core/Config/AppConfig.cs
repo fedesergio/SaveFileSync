@@ -37,6 +37,15 @@ public sealed class AppConfig
     /// </summary>
     public bool AutoSetup { get; set; } = true;
 
+    /// <summary>How many versions to keep restorable for games added from this PC (shared in the game's definition).</summary>
+    public int DefaultKeepVersions { get; set; } = 10;
+
+    /// <summary>
+    /// Once a day: archive versions beyond the limit, delete the contents nobody needs any more
+    /// (after a 14-day grace period) and repair blobs that went missing.
+    /// </summary>
+    public bool HistoryCleanup { get; set; } = true;
+
     /// <summary>Emulator id → folder of its exe on this PC (e.g. "rpcs3" → "C:\Emulators\RPCS3").</summary>
     public Dictionary<string, string> EmulatorDirs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

@@ -30,6 +30,8 @@ public partial class SettingsWindow : FluentWindow
         _roots = new ObservableCollection<string>(config.LibraryRoots);
         Roots.ItemsSource = _roots;
         AutoSetup.IsChecked = config.AutoSetup;
+        DefaultKeep.Value = config.DefaultKeepVersions;
+        HistoryCleanup.IsChecked = config.HistoryCleanup;
         ShowDatabaseStatus();
         About.Text =
             $"SaveFileSync {AppHost.AppVersion}\n" +
@@ -44,6 +46,30 @@ public partial class SettingsWindow : FluentWindow
         DatabaseStatus.Text = _host.Manifest.HasIndex
             ? $"{status.GameCount:N0} games with Windows save data. Updated {status.UpdatedUtc?.ToLocalTime():g}, last checked {status.CheckedUtc?.ToLocalTime():g}."
             : "Not downloaded yet. It is downloaded the first time you add a game from the database.";
+    }
+
+    private async void OnCleanNow(object sender, RoutedEventArgs e)
+    {
+        CleanNow.IsEnabled = false;
+        CleanResult.Text = "Cleaning up…";
+        try
+        {
+            var report = await _host.Service!.RunMaintenanceAsync();
+            CleanResult.Text =
+                $"Archived {report.Archived} version(s). " +
+                (report.Cleanup.SkippedReason is { } why
+                    ? $"File cleanup skipped: {why}"
+                    : $"{report.Cleanup.Deleted} unused file(s) deleted, {report.Cleanup.Waiting} waiting out the 14-day grace period.") +
+                (report.Repaired > 0 ? $" {report.Repaired} missing file(s) re-uploaded." : "");
+        }
+        catch (Exception ex)
+        {
+            CleanResult.Text = ex.Message;
+        }
+        finally
+        {
+            CleanNow.IsEnabled = true;
+        }
     }
 
     private async void OnUpdateDatabase(object sender, RoutedEventArgs e)
@@ -130,6 +156,8 @@ public partial class SettingsWindow : FluentWindow
             c.InPlayCapMinutes = (int)(InPlayCapMinutes.Value ?? c.InPlayCapMinutes);
             c.LibraryRoots = _roots.ToList();
             c.AutoSetup = AutoSetup.IsChecked == true;
+            c.DefaultKeepVersions = (int)(DefaultKeep.Value ?? c.DefaultKeepVersions);
+            c.HistoryCleanup = HistoryCleanup.IsChecked == true;
         });
 
         if (StartWithWindows.IsChecked == true)

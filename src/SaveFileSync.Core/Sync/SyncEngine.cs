@@ -29,6 +29,8 @@ public enum SyncResultKind
     LocalEmptied,
     LocationMissing,
     RepositoryUnavailable,
+    /// <summary>The requested action cannot be done now (see <see cref="SyncResult.Message"/>).</summary>
+    Refused,
 }
 
 /// <param name="Groups">
@@ -324,6 +326,137 @@ public sealed class SyncEngine
         return Apply(unit, bindings, scan, baseVersion, force: true);
     }
 
+    /// <summary>
+    /// Restores an older version (PLAN.md §11, phase 3). The game is first brought in sync, so
+    /// what gets overwritten is already in the repository; then a <see cref="VersionKind.Restore"/>
+    /// version with the old contents is created on top of the current one and applied here. Other
+    /// PCs receive it like any other change. Nothing is lost: the replaced version stays in the history.
+    /// </summary>
+    public SyncResult RestoreVersion(UnitDefinition unit, IReadOnlyDictionary<string, string> bindings, string versionId)
+    {
+        if (GetConflict(unit.UnitId) is not null)
+        {
+            return Refused("Resolve the conflict first.");
+        }
+
+        var synced = Sync(unit, bindings, SyncOptions.Full);
+        if (synced.Kind is not (SyncResultKind.UpToDate or SyncResultKind.Pushed or SyncResultKind.Pulled))
+        {
+            return synced.Kind == SyncResultKind.Conflict
+                ? Refused("Resolve the conflict first.")
+                : Refused($"This game is not fully in sync yet ({synced.Kind}). Try again in a moment.");
+        }
+
+        var scan = _scanner.Scan(unit, bindings);
+        if (scan.MissingLocations.Count > 0)
+        {
+            return SyncResult.Of(SyncResultKind.LocationMissing, string.Join(", ", scan.MissingLocations));
+        }
+
+        if (scan.Unstable)
+        {
+            return SyncResult.Of(SyncResultKind.Unstable);
+        }
+
+        var (graph, _) = LoadGraph(unit.UnitId);
+        var target = graph.Get(versionId);
+        if (target is null)
+        {
+            return Refused("That version is not available.");
+        }
+
+        if (LoadArchivedIds(unit.UnitId).Contains(versionId))
+        {
+            return Refused("That version is archived: its contents were removed to save space.");
+        }
+
+        if (!HasAllBlobs(target))
+        {
+            return Refused("The contents of that version are not fully available yet (OneDrive may still be syncing).");
+        }
+
+        if (graph.Tips.Count != 1)
+        {
+            return Refused("Another PC has changes that are not merged yet. Let them sync first.");
+        }
+
+        var tip = graph.Tips[0];
+        if (target.Content.ContentEquals(tip.Content))
+        {
+            return SyncResult.Of(SyncResultKind.UpToDate, "That is already the current version.");
+        }
+
+        if (!scan.Snapshot.ContentEquals(tip.Content))
+        {
+            return Refused("The saves on this PC changed while preparing the restore. Try again.");
+        }
+
+        var restored = CreateVersion(unit.UnitId, [tip.VersionId], VersionKind.Restore, target.Files.ToList(), $"Restored version {target.VersionId}");
+        _state.PutCachedVersion(restored, complete: true);
+        _log.LogInformation("Unit {Unit}: restoring {Target} as {Version}", unit.UnitId, target.VersionId, restored.VersionId);
+        return Apply(unit, bindings, scan, restored, force: false);
+    }
+
+    /// <summary>
+    /// If blobs of this PC's current base vanished from the repository (e.g. cleaned up while this PC was
+    /// offline), uploads them again from the local files, so that other PCs can complete that version.
+    /// </summary>
+    public int RepairMissingBlobs(UnitDefinition unit, IReadOnlyDictionary<string, string> bindings)
+    {
+        var baseId = GetBaseVersionId(unit.UnitId);
+        var baseVersion = baseId is null ? null : _remote.ReadVersion(unit.UnitId, baseId);
+        if (baseVersion is null)
+        {
+            return 0;
+        }
+
+        var missing = baseVersion.Files
+            .Where(f => _remote.GetBlobState(f.Sha256, f.Size) is BlobState.Missing or BlobState.SizeMismatch)
+            .ToList();
+        if (missing.Count == 0)
+        {
+            return 0;
+        }
+
+        var scan = _scanner.Scan(unit, bindings, updateIndex: false);
+        if (scan.MissingLocations.Count > 0)
+        {
+            return 0;
+        }
+
+        var repaired = 0;
+        foreach (var file in missing)
+        {
+            if (!scan.Snapshot.TryGet(file.Key, out var local) || !string.Equals(local.Sha256, file.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                var path = scan.AbsolutePaths[file.Key];
+                _remote.PutBlob(file.Sha256, file.Size, () => Hashing.OpenShared(path), _device.ShortId);
+                repaired++;
+            }
+            catch (Exception ex) when (ex is IOException)
+            {
+                _log.LogInformation("Unit {Unit}: could not re-upload {File}: {Message}", unit.UnitId, file.Path, ex.Message);
+            }
+        }
+
+        if (repaired > 0)
+        {
+            _log.LogWarning("Unit {Unit}: re-uploaded {Count} blob(s) of the current version that had disappeared from the repository", unit.UnitId, repaired);
+        }
+
+        return repaired;
+    }
+
+    private bool HasAllBlobs(VersionManifest version) =>
+        version.Files.All(f => _remote.GetBlobState(f.Sha256, f.Size) is BlobState.Present or BlobState.CloudOnly);
+
+    private static SyncResult Refused(string message) => SyncResult.Of(SyncResultKind.Refused, message);
+
     /// <summary>"Delete on all PCs": confirms that the local files were removed on purpose.</summary>
     public SyncResult PropagateDeletion(UnitDefinition unit, IReadOnlyDictionary<string, string> bindings)
     {
@@ -339,10 +472,20 @@ public sealed class SyncEngine
     }
 
     /// <summary>Reads the complete versions of a unit (cached locally once complete).</summary>
+    /// <summary>Versions whose contents were removed on purpose (union over all devices' archive files).</summary>
+    public HashSet<string> LoadArchivedIds(string unitId) =>
+        _remote.ReadArchive(unitId).SelectMany(d => d.VersionIds).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Archived versions count as complete: they keep their place in the history (so merges still
+    /// find their common ancestor) but cannot be applied; only tips and bases are ever applied,
+    /// and those are never archived.
+    /// </summary>
     public (VersionGraph Graph, int Incomplete) LoadGraph(string unitId)
     {
         var complete = new List<VersionManifest>();
         var incomplete = 0;
+        var archived = LoadArchivedIds(unitId);
         foreach (var id in _remote.ListVersionIds(unitId))
         {
             var version = _state.GetCachedVersion(unitId, id, out var isComplete);
@@ -360,7 +503,8 @@ public sealed class SyncEngine
 
             if (!isComplete)
             {
-                isComplete = version.Files.All(f => _remote.GetBlobState(f.Sha256, f.Size) is BlobState.Present or BlobState.CloudOnly);
+                isComplete = archived.Contains(id)
+                             || version.Files.All(f => _remote.GetBlobState(f.Sha256, f.Size) is BlobState.Present or BlobState.CloudOnly);
                 _state.PutCachedVersion(version, isComplete);
             }
 
