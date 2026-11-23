@@ -33,7 +33,8 @@ public sealed record UnitStatus(
     DateTime? QuietUntilUtc,
     bool GameRunning,
     bool IsBound,
-    ConflictInfo? Conflict);
+    ConflictInfo? Conflict,
+    bool HasRegistryData = false);
 
 public enum NotificationLevel
 {

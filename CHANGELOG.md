@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-11-23 — Phase 2
+
+### Added
+- Game database: the Ludusavi manifest is downloaded on demand (conditional
+  request with ETag, at most once a week when adding a game, or *Settings →
+  Update now*), parsed as a stream and cached as a 5 MB index. Search by name,
+  with aliases, and games found on this PC marked.
+- *Add game* from the database, from an emulator preset (RPCS3, Ryujinx) or
+  manually. Save folders are stored as templates (`<winAppData>/…`, `<base>/…`)
+  without absolute paths or user names.
+- Automatic setup on other PCs: games added elsewhere are bound when their save
+  folder is found in exactly one place (known folders, library folders,
+  emulator folders). Existing different saves become a conflict, never an
+  overwrite. Can be switched off in Settings.
+- Known folders through the shell API (moved Documents folders work); library
+  folders in the wizard and Settings.
+- Process names suggested from the database and checked against the install folder.
+- RPCS3 preset (`vfs.yml` aware, merges per save folder) and Ryujinx preset
+  (portable or AppData, one whole unit).
+- Notes for games that also use the Windows registry (not synced) and warnings for
+  save folders protected by Controlled folder access.
+- *Find folders automatically* in game details.
+- `--selftest-ui` now exercises the add-game flow and reports WPF binding errors.
+- Tests: manifest parser, index and cache, update with ETag, templates, folder
+  finder, presets, resolver, and two-PC automatic setup.
+
+### Changed
+- Unit definitions can carry `templates` and `source` (older ones still work).
+
 ## [0.2.0] — 2026-11-18 — Phase 1b
 
 ### Added
@@ -53,5 +82,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
   integration tests and the handheld-sleep scenario.
 - CI on GitHub Actions (build, tests, secret scan; release exe on tags).
 
+[0.3.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.3.0
 [0.2.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.2.0
 [0.1.0]: https://github.com/fedesergio/SaveFileSync/releases/tag/v0.1.0

@@ -6,6 +6,7 @@ using Microsoft.Win32;
 using SaveFileSync.Core.Model;
 using SaveFileSync.Core.Service;
 using SaveFileSync.Core.Sync;
+using SaveFileSync.Windows;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
@@ -30,15 +31,31 @@ public partial class UnitDetailsWindow : FluentWindow
         var bindings = host.Config.Snapshot().Bindings.GetValueOrDefault(unitId) ?? new Dictionary<string, string>();
         foreach (var location in _definition.Locations)
         {
-            _locations.Add(new LocationRow
+            var row = new LocationRow
             {
                 Id = location.Id,
                 Label = location.Label ?? location.Id,
                 Path = bindings.GetValueOrDefault(location.Id) ?? "",
                 Includes = string.Join("; ", location.Includes),
                 Excludes = string.Join("; ", location.Excludes),
-            });
+                // Templates describe the game, not this PC's choice: they stay when the folder is changed here.
+                Templates = location.Templates,
+            };
+            row.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(LocationRow.Path))
+                {
+                    UpdateFolderWarnings();
+                }
+            };
+            _locations.Add(row);
         }
+
+        var registryKeys = _definition.Source?.RegistryKeys ?? 0;
+        RegistryBar.IsOpen = registryKeys > 0;
+        RegistryBar.Message = $"This game also keeps data in the Windows registry ({registryKeys} key(s)). " +
+                              "SaveFileSync cannot sync registry data yet: only the save files are synced.";
+        UpdateFolderWarnings();
 
         Locations.ItemsSource = _locations;
         GameName.Text = _definition.Name;
@@ -91,6 +108,57 @@ public partial class UnitDetailsWindow : FluentWindow
             UnitState.Error or UnitState.LocationMissing or UnitState.RepositoryUnavailable => (true, InfoBarSeverity.Error, "Problem", status.Detail),
             _ => (false, InfoBarSeverity.Informational, "", ""),
         };
+    }
+
+    private void OnAutoDetect(object sender, RoutedEventArgs e)
+    {
+        IReadOnlyDictionary<string, string>? found;
+        try
+        {
+            found = _host.Resolver.TryResolve(_definition);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, ex.Message, "SaveFileSync", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (found is null)
+        {
+            MessageBox.Show(this,
+                "The save folders could not be found automatically on this PC (not installed, not played yet, or " +
+                "more than one possible folder). Choose them with Browse…" +
+                (_definition.Source?.Kind == UnitSource.ManifestKind && _host.Config.Snapshot().LibraryRoots.Count == 0
+                    ? "\n\nTip: add your game library folders (e.g. C:\\Games) in Settings so games installed there can be found."
+                    : ""),
+                "SaveFileSync", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        foreach (var row in _locations.Where(r => found.ContainsKey(r.Id)))
+        {
+            row.Path = found[row.Id];
+        }
+    }
+
+    private void UpdateFolderWarnings()
+    {
+        var messages = new List<string>();
+        foreach (var row in _locations.Where(r => r.Path.Length > 0))
+        {
+            if (OneDrive.IsInsideOneDrive(row.Path))
+            {
+                messages.Add($"{row.Path} is inside OneDrive, which already syncs it: syncing it again can create OneDrive conflict copies of game files.");
+            }
+
+            if (ControlledFolderAccess.WarningFor(row.Path) is { } cfa)
+            {
+                messages.Add(cfa);
+            }
+        }
+
+        FolderWarning.IsOpen = messages.Count > 0;
+        FolderWarning.Message = string.Join(Environment.NewLine, messages.Distinct());
     }
 
     private void OnBrowseLocation(object sender, RoutedEventArgs e)

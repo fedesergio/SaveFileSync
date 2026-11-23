@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SaveFileSync.Core.Config;
 using SaveFileSync.Core.Model;
+using SaveFileSync.Core.Paths;
 using SaveFileSync.Core.Sync;
 
 namespace SaveFileSync.Core.Service;
@@ -34,6 +35,7 @@ public sealed class SyncService : IDisposable
         TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(60),
     ];
 
+    private readonly ILocationResolver? _resolver;
     private readonly SyncEngine _engine;
     private readonly ConfigStore _config;
     private readonly DeviceIdentity _device;
@@ -67,8 +69,10 @@ public sealed class SyncService : IDisposable
         IProcessMonitor processes,
         IClock clock,
         ILogger? log = null,
-        SyncServiceOptions? options = null)
+        SyncServiceOptions? options = null,
+        ILocationResolver? resolver = null)
     {
+        _resolver = resolver;
         _engine = engine;
         _config = config;
         _device = device;
@@ -183,7 +187,8 @@ public sealed class SyncService : IDisposable
         IReadOnlyList<LocationDefinition> locations,
         IReadOnlyList<string> processNames,
         IReadOnlyDictionary<string, string> bindings,
-        MergeGranularity granularity = MergeGranularity.Unit) =>
+        MergeGranularity granularity = MergeGranularity.Unit,
+        UnitSource? source = null) =>
         Invoke(() =>
         {
             var unitId = NewUnitId(name);
@@ -194,6 +199,7 @@ public sealed class SyncService : IDisposable
                 Locations = locations,
                 ProcessNames = processNames.Select(NormalizeProcessName).Where(p => p.Length > 0).Distinct().ToList(),
                 Granularity = granularity,
+                Source = source,
                 Revision = 1,
                 RevisionDevice = _device.ShortId,
                 UpdatedUtc = _clock.UtcNow,
@@ -211,19 +217,13 @@ public sealed class SyncService : IDisposable
     public Task UpdateUnitAsync(UnitDefinition updated) => Invoke(() =>
     {
         var current = _engine.Remote.ReadUnitDefinition(updated.UnitId) ?? updated;
-        var next = new UnitDefinition
-        {
-            UnitId = updated.UnitId,
-            Name = updated.Name,
-            Locations = updated.Locations,
-            ProcessNames = updated.ProcessNames.Select(NormalizeProcessName).Where(p => p.Length > 0).Distinct().ToList(),
-            Granularity = updated.Granularity,
-            Mode = updated.Mode,
-            Removed = updated.Removed,
-            Revision = current.Revision + 1,
-            RevisionDevice = _device.ShortId,
-            UpdatedUtc = _clock.UtcNow,
-        };
+        var next = current.Revised(
+            _device.ShortId,
+            _clock.UtcNow,
+            name: updated.Name,
+            locations: updated.Locations,
+            processNames: updated.ProcessNames.Select(NormalizeProcessName).Where(p => p.Length > 0).Distinct().ToList(),
+            granularity: updated.Granularity);
         _engine.Remote.WriteUnitDefinition(next, _device.ShortId);
         RefreshUnits();
         return true;
@@ -246,21 +246,7 @@ public sealed class SyncService : IDisposable
     {
         if (fromAllPcs && _engine.Remote.ReadUnitDefinition(unitId) is { } def)
         {
-            _engine.Remote.WriteUnitDefinition(
-                new UnitDefinition
-                {
-                    UnitId = def.UnitId,
-                    Name = def.Name,
-                    Locations = def.Locations,
-                    ProcessNames = def.ProcessNames,
-                    Granularity = def.Granularity,
-                    Mode = def.Mode,
-                    Removed = true,
-                    Revision = def.Revision + 1,
-                    RevisionDevice = _device.ShortId,
-                    UpdatedUtc = _clock.UtcNow,
-                },
-                _device.ShortId);
+            _engine.Remote.WriteUnitDefinition(def.Revised(_device.ShortId, _clock.UtcNow, removed: true), _device.ShortId);
         }
 
         _config.Update(c =>
@@ -495,6 +481,11 @@ public sealed class SyncService : IDisposable
 
     private void Evaluate(UnitRuntime rt, DateTime now, AppConfig config, bool globalPause)
     {
+        if (!rt.IsBound && config.AutoSetup && _resolver is not null && now >= rt.NextAutoSetup)
+        {
+            TryAutoSetup(rt, now);
+        }
+
         if (!rt.IsBound)
         {
             rt.Set(UnitState.NotSetUp, "Available — set up on this PC");
@@ -592,6 +583,44 @@ public sealed class SyncService : IDisposable
         rt.RemoteDirty = false;
         rt.NeedsScan = false;
         HandleResult(rt, now, result);
+    }
+
+    /// <summary>
+    /// Binds a game that another PC added when its save folder is found here (PLAN.md §7).
+    /// The first sync still goes through the normal rules: local data that differs from the
+    /// repository becomes a conflict to choose from, never a silent overwrite.
+    /// </summary>
+    private void TryAutoSetup(UnitRuntime rt, DateTime now)
+    {
+        rt.NextAutoSetup = now + TimeSpan.FromMinutes(2);
+        IReadOnlyDictionary<string, string>? found;
+        try
+        {
+            found = _resolver!.TryResolve(rt.Definition);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogDebug(ex, "Unit {Unit}: automatic setup could not look for the save folder", rt.UnitId);
+            return;
+        }
+
+        if (found is null)
+        {
+            return;
+        }
+
+        var bindings = new Dictionary<string, string>(found, StringComparer.Ordinal);
+        _config.Update(c => c.Bindings[rt.UnitId] = new Dictionary<string, string>(bindings, StringComparer.Ordinal));
+        rt.Bindings = bindings;
+        rt.IsBound = true;
+        rt.ForceNow = true;
+        if (_options.UseWatchers)
+        {
+            _watchers.WatchUnit(rt.UnitId, bindings.Values);
+        }
+
+        _log.LogInformation("Unit {Unit}: set up automatically on this PC", rt.UnitId);
+        AddActivity(rt.Definition.Name, ActivityKind.Info, "Set up automatically on this PC");
     }
 
     private void HandleResult(UnitRuntime rt, DateTime now, SyncResult result)
@@ -1031,12 +1060,16 @@ public sealed class SyncService : IDisposable
             QuietUntil = quietUntil;
         }
 
+        public DateTime NextAutoSetup { get; set; } = DateTime.MinValue;
+
         public UnitStatus ToStatus(UnitState state, string detail, SyncService owner) =>
-            new(UnitId, Definition.Name, state, detail, LastSyncUtc, LastChangeDevice, null, Busy, IsBound, Conflict);
+            new(UnitId, Definition.Name, state, detail, LastSyncUtc, LastChangeDevice, null, Busy, IsBound, Conflict, HasRegistryData);
+
+        private bool HasRegistryData => Definition.Source?.RegistryKeys > 0;
 
         public UnitStatus LastStatus(SyncService owner)
         {
-            var status = new UnitStatus(UnitId, Definition.Name, State, Detail, LastSyncUtc, LastChangeDevice, QuietUntil, Busy, IsBound, Conflict);
+            var status = new UnitStatus(UnitId, Definition.Name, State, Detail, LastSyncUtc, LastChangeDevice, QuietUntil, Busy, IsBound, Conflict, HasRegistryData);
             if (_last is not null && _last == status)
             {
                 return _last;

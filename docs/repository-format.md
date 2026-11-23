@@ -38,6 +38,31 @@ Files whose name contains `.tmp-` are writes in progress: ignore them.
 A location is a logical folder. Its absolute path is different on each PC and
 is **never** stored in the repository.
 
+Units added from the game database or an emulator preset also carry (all
+optional; older definitions simply lack them):
+
+```json
+{
+  "locations": [
+    { "id": "saves", "includes": ["**"],
+      "templates": ["<winAppData>/Hollow Knight/saves"] }
+  ],
+  "source": {
+    "kind": "manifest",          // manual | manifest | preset
+    "manifestName": "Hollow Knight",
+    "steamId": 367520,
+    "installDirs": ["Hollow Knight"],
+    "presetId": null,            // e.g. "rpcs3" for emulator presets
+    "registryKeys": 0            // Windows registry keys that are NOT synced
+  }
+}
+```
+
+`templates` say where another PC should look for the folder, with tokens such
+as `<winAppData>`, `<winLocalAppData>`, `<winDocuments>`, `<home>` and
+`<base>` (= a library folder plus one of `installDirs`). They contain no
+absolute paths and no user names.
+
 ## Version manifest (`versions\*.json`)
 
 ```json

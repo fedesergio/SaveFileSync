@@ -21,6 +21,10 @@ public sealed partial class UnitItemViewModel : ObservableObject
     [ObservableProperty]
     private string _lastSyncText = "";
 
+    /// <summary>Extra line under the status, e.g. that registry data is not synced.</summary>
+    [ObservableProperty]
+    private string _note = "";
+
     private DateTime? _quietUntil;
     private string _baseDetail = "";
 
@@ -39,6 +43,7 @@ public sealed partial class UnitItemViewModel : ObservableObject
         _quietUntil = status.QuietUntilUtc;
         var last = status.LastSyncUtc is { } t ? $"Last sync {t.ToLocalTime():g}" : "Never synced on this PC";
         LastSyncText = status.LastChangeDevice is { } device ? $"{last} · latest from {device}" : last;
+        Note = status.HasRegistryData ? "Also uses the Windows registry (registry data is not synced)" : "";
         Tick();
     }
 

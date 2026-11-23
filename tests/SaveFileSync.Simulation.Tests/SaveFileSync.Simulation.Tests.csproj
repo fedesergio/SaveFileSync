@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SaveFileSync.Core\SaveFileSync.Core.csproj" />
     <ProjectReference Include="..\..\src\SaveFileSync.Repository\SaveFileSync.Repository.csproj" />
+    <ProjectReference Include="..\..\src\SaveFileSync.Manifest\SaveFileSync.Manifest.csproj" />
   </ItemGroup>
 
 </Project>

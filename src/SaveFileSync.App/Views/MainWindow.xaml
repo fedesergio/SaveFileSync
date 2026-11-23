@@ -70,6 +70,7 @@
                     <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" Margin="0,2,0,0" />
                     <TextBlock Text="{Binding LastSyncText}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding Note}" Foreground="#D9821E" FontSize="12" TextWrapping="Wrap" />
                   </StackPanel>
                   <Border Grid.Column="1" Style="{StaticResource Chip}" Background="{Binding State, Converter={StaticResource StateToBrush}}" Margin="12,0,0,0">
                     <TextBlock Text="{Binding State, Converter={StaticResource StateToText}}" Foreground="White" FontSize="12" />

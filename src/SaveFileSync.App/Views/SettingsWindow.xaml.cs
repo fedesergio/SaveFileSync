@@ -29,10 +29,42 @@ public partial class SettingsWindow : FluentWindow
         InPlayCapMinutes.Value = config.InPlayCapMinutes;
         _roots = new ObservableCollection<string>(config.LibraryRoots);
         Roots.ItemsSource = _roots;
+        AutoSetup.IsChecked = config.AutoSetup;
+        ShowDatabaseStatus();
         About.Text =
             $"SaveFileSync {AppHost.AppVersion}\n" +
-            "Save locations data (from a later version): Ludusavi manifest, compiled from PCGamingWiki.\n" +
-            "Built with .NET, WPF-UI, SQLite and Serilog.";
+            "Save locations: Ludusavi manifest (https://github.com/mtkennerly/ludusavi-manifest), compiled from PCGamingWiki " +
+            "(https://www.pcgamingwiki.com). Personal, non-commercial use.\n" +
+            "Built with .NET, WPF-UI, SQLite, YamlDotNet and Serilog.";
+    }
+
+    private void ShowDatabaseStatus()
+    {
+        var status = _host.Manifest.GetStatus();
+        DatabaseStatus.Text = _host.Manifest.HasIndex
+            ? $"{status.GameCount:N0} games with Windows save data. Updated {status.UpdatedUtc?.ToLocalTime():g}, last checked {status.CheckedUtc?.ToLocalTime():g}."
+            : "Not downloaded yet. It is downloaded the first time you add a game from the database.";
+    }
+
+    private async void OnUpdateDatabase(object sender, RoutedEventArgs e)
+    {
+        UpdateDatabase.IsEnabled = false;
+        DatabaseProgress.Visibility = Visibility.Visible;
+        try
+        {
+            var result = await _host.Manifest.UpdateAsync(force: true, DateTime.UtcNow);
+            DatabaseProgress.Visibility = Visibility.Collapsed;
+            ShowDatabaseStatus();
+            if (result.Kind == SaveFileSync.Manifest.ManifestUpdateKind.Failed)
+            {
+                MessageBox.Show(this, $"Could not update the game database: {result.Error}", "SaveFileSync", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        finally
+        {
+            DatabaseProgress.Visibility = Visibility.Collapsed;
+            UpdateDatabase.IsEnabled = true;
+        }
     }
 
     private void OnAddRoot(object sender, RoutedEventArgs e)
@@ -97,6 +129,7 @@ public partial class SettingsWindow : FluentWindow
             c.ProcessExitDelaySeconds = (int)(ExitDelaySeconds.Value ?? c.ProcessExitDelaySeconds);
             c.InPlayCapMinutes = (int)(InPlayCapMinutes.Value ?? c.InPlayCapMinutes);
             c.LibraryRoots = _roots.ToList();
+            c.AutoSetup = AutoSetup.IsChecked == true;
         });
 
         if (StartWithWindows.IsChecked == true)

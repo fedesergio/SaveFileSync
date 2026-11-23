@@ -49,12 +49,24 @@
 
         <TextBlock Text="Game library folders" Style="{StaticResource SectionTitle}" />
         <TextBlock Style="{StaticResource Secondary}" FontSize="12"
-                   Text="Where games are installed on this PC. Used to find save folders automatically in a later version." />
+                   Text="Where games are installed on this PC (e.g. C:\Games). Used to find the save folders of games that are installed there." />
         <ListBox x:Name="Roots" Height="90" Margin="0,8,0,0" />
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
           <ui:Button Content="Add folder…" Click="OnAddRoot" Margin="0,0,8,0" />
           <ui:Button Content="Remove" Click="OnRemoveRoot" />
         </StackPanel>
+
+        <CheckBox x:Name="AutoSetup" Margin="0,16,0,0"
+                  Content="Set up games from my other PCs automatically when their save folder is found here" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="28,2,0,0"
+                   Text="Only when the folder is found in exactly one place. If saves already exist here and differ, you are asked which version to keep: nothing is overwritten silently." />
+
+        <TextBlock Text="Game database" Style="{StaticResource SectionTitle}" />
+        <TextBlock x:Name="DatabaseStatus" Style="{StaticResource Secondary}" />
+        <ProgressBar x:Name="DatabaseProgress" IsIndeterminate="True" Height="3" Margin="0,6,0,0" Visibility="Collapsed" />
+        <ui:Button x:Name="UpdateDatabase" Content="Update now" Icon="{ui:SymbolIcon ArrowSync24}" Click="OnUpdateDatabase" Margin="0,8,0,0" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
+                   Text="Save locations come from the Ludusavi manifest, compiled from PCGamingWiki. It is downloaded on this PC only (about 17 MB) and checked at most once a week when you add a game." />
 
         <TextBlock Text="Troubleshooting" Style="{StaticResource SectionTitle}" />
         <WrapPanel>

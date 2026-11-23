@@ -1,6 +1,6 @@
 # SaveFileSync — Plan
 
-Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`)
+Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`)
 
 SaveFileSync is a personal Windows tool that keeps game saves in sync across
 several PCs (Windows 11 desktop, ROG Xbox Ally X, future machines) using the
@@ -520,12 +520,27 @@ Results are globbed, and the matches become the binding.
 ### 7.3 Ludusavi manifest
 
 - **Source:** `https://raw.githubusercontent.com/mtkennerly/ludusavi-manifest/refs/heads/data/data/manifest.yaml`
-  (over 10 MB).
-  - Downloaded with `If-None-Match` (ETag), at most once a day.
-  - Cached in `%LOCALAPPDATA%\SaveFileSync\cache\`.
-  - Converted into a compact index (game name, aliases, Windows file entries
-    tagged `save`, registry entries, `installDir`, `launch` executables,
-    `steam.id`).
+  (17 MB, 53,575 entries, served with an `ETag`).
+  - Downloaded with `If-None-Match` (ETag). It is only needed when a game is
+    added, so it is checked **on demand**: when the *Add game* window opens and
+    the last check is older than 7 days, or from *Settings → Update now*. (The
+    first plan said "once a day in the background"; nothing needs the manifest
+    in the background, and 17 MB a day on a handheld is wasteful.)
+  - Parsed as a stream, entry by entry (4 s, 64 MB peak), and reduced to a
+    compact JSON index in `%LOCALAPPDATA%\SaveFileSync\cache\` (5 MB). The YAML
+    itself is deleted after parsing. The index is loaded (0.2 s) only while the
+    *Add game* window is open: background memory is unchanged.
+  - Kept per game: name and aliases, Windows file paths tagged `save`/`config`,
+    registry keys, `installDir`, `launch` executables, Steam/GOG ids. Of the
+    53,575 entries, 14,512 have Windows data.
+  - Filtering rules (checked against the real data): paths for other OSes and
+    `<xdg…>` tokens are dropped; entries that apply only to the Microsoft store
+    (Game Pass) are dropped; other `store` constraints are ignored, because a
+    DRM-free copy usually keeps its saves where the Steam/GOG copy does; paths
+    under `<root>/userdata` and `<root>/steamapps` are Steam's own and are kept
+    with a flag for phase 5 but not used here.
+  - The real data has `**` in about 2,000 paths, 1,100 aliases, and names that
+    differ only by case; the parser handles all of them.
 - **Licence:** the manifest *code* is MIT. The repository does not declare a
   licence for the *data*, which is "compiled from data on PCGamingWiki".
   PCGamingWiki content is believed to be CC BY-NC-SA 3.0. This could not be
@@ -536,17 +551,45 @@ Results are globbed, and the matches become the binding.
   - the About screen credits PCGamingWiki and Ludusavi.
 
   Open decision O2 covers the verification.
-- **Emulator presets:** written by us and shipped as embedded JSON. They are not
-  taken from the manifest, which does not describe per-game emulator saves.
+- **How a manifest game becomes a unit.** Each manifest path is split at its
+  first wildcard: the part before it is the location's **folder**, the rest
+  becomes include globs (so a location always has exactly one folder and the
+  same logical shape on every PC). `<storeUserId>` counts as a wildcard. The
+  unit stores, per location, the folder as a **template** (`<winAppData>/Game`,
+  `<base>/saves`) plus `source.installDirs`; it never stores an absolute path or
+  a user name. On another PC the templates are expanded with that PC's known
+  folders and library roots, and the location is bound automatically if it
+  resolves to exactly one existing folder (§7.4).
+- **Emulator presets:** written by us in code (`EmulatorPresets`), not taken
+  from the manifest, which does not describe per-game emulator saves. A preset
+  unit stores only `source.presetId` and logical locations; each PC finds the
+  emulator folder itself (saved setting, a running instance, library folders and
+  one level below them).
 
-| Preset | Location | Includes | Excludes | Merge | Process |
-|---|---|---|---|---|---|
-| RPCS3 | `rpcs3-hdd0` = `<rpcs3 dir>/dev_hdd0` (honours `config/vfs.yml` if `/dev_hdd0/` is redirected) | `home/*/savedata/**` (optional: `home/*/trophy/**`) | `game/**`, caches, logs | `folder` (each save dir) | `rpcs3.exe` |
-| Ryujinx | `ryujinx-data` = `%APPDATA%\Ryujinx`, or `<exe dir>\portable` if present | `bis/user/save/**`, `bis/user/saveMeta/**`, `bis/system/save/8000000000000000/**` (save index), `system/Profiles.json` | `system/*.keys`, `bis/user/Contents/**`, `games/**`, `Config.json`, logs, shader caches | `unit` | `Ryujinx*.exe` |
+| Preset | Location (found per PC) | Includes | Merge | Process |
+|---|---|---|---|---|
+| RPCS3 | `savedata` = `<dev_hdd0>\home\<user>\savedata`; `dev_hdd0` follows `config\vfs.yml` (`/dev_hdd0/`, `$(EmulatorDir)`), `<user>` is `00000001` or the only user folder | everything | `folder` (each `<SAVE_DIR>` is one save) | `rpcs3` |
+| Ryujinx | `data` = `<exe dir>\portable` if it exists, else `%APPDATA%\Ryujinx` | `bis/user/save/**`, `bis/user/saveMeta/**`, `bis/system/save/8000000000000000/**` (save index), `system/Profiles.json` | `unit` | `ryujinx`, `ryujinx.ava` |
+
+RPCS3's location is `…\savedata` (not `dev_hdd0`) on purpose: the merge groups
+files by their first folder, which must be the save directory. Trophies are not
+synced (O3, decided: they can be added as a manual location).
 
 The Ryujinx layout is an **assumption to verify with real data** (A6). Its save
 folders are numbered by an index, not by title, so the whole save area plus the
 index must be synced as one atomic unit. The first setup must seed from one PC.
+
+### 7.4 Automatic setup on another PC
+
+Every few minutes, for each game that exists in the repository but is not bound
+on this PC, the service asks the resolver to find its folders. It binds the game
+only if **every** location resolves to **exactly one existing** folder (zero or
+several candidates leave it to the user). Binding does not bypass the sync
+rules: if saves already exist there and differ from the repository, the first
+sync is an initial conflict to choose from, never a silent overwrite. It can be
+switched off in *Settings*. Games installed under a library root (e.g.
+`C:\Games`) need that folder configured on each PC, since `<base>` is
+`<library root>\<installDir>`.
 
 ---
 
@@ -784,14 +827,27 @@ Acceptance checklist (in addition to 1a):
 
 ### Phase 2 — Automatic detection → `v0.3.0` (MVP complete)
 
-- Manifest download (ETag), index, and search in *Add game*.
-- Library roots and `installDir` scanning.
-- Known-folder resolver; automatic binding on the second PC.
-- Process names inferred from the manifest's `launch` entries.
+**Implemented** (see §7.3–7.4):
+- Manifest download (ETag), streaming parser, compact index, name search, and
+  detection of the games present on this PC (94 found on the development PC in
+  0.2 s). *Add game* has three ways in: game database, emulator, manual.
+- Library roots (wizard and Settings) and `installDir` scanning.
+- Known-folder resolver (shell API, so a moved Documents folder works);
+  automatic setup on the second PC.
+- Process names suggested from the manifest's `launch` entries, narrowed to the
+  executables that really exist in the install folder.
 - RPCS3 and Ryujinx presets, with RPCS3 `vfs.yml` support and Ryujinx portable
-  detection. Verify A6 on real data.
-- Warning for saves inside OneDrive; registry badge; Controlled Folder Access
-  diagnostics.
+  detection.
+- Warning for saves inside OneDrive; "also uses the registry (not synced)" note
+  in the list and in the details; Controlled folder access warning for save
+  folders it would protect.
+- Unit definitions carry `templates` (per location) and `source`; older
+  definitions without them keep working (manual units).
+
+**Still to verify by hand** (no such data on the development PC): A6 (Ryujinx
+layout), A7 (RPCS3 layout), the real behaviour of Controlled folder access, and
+O2 (data licence). The tests use synthetic folder trees that follow these
+assumptions.
 
 ### Phase 3 — History & restore → `v0.4.0` (MVP+ part 1)
 
@@ -921,8 +977,9 @@ issues.
   PCs. Save-format compatibility between versions is the user's responsibility.
 - **A6** The Ryujinx (or fork) data layout matches §7.3, including the save
   index at `bis/system/save/8000000000000000`. It **must be verified** on real
-  data in phase 2; until then Ryujinx is configured as a manual unit with
-  `unit` granularity.
+  data: the Ryujinx preset is built on this assumption (tests use a synthetic
+  folder tree). Check on a PC that has Ryujinx saves before relying on it; the
+  unit can always be edited into a manual one.
 - **A7** The RPCS3 layout is `dev_hdd0/home/<user>/savedata/<SAVE_DIR>/`, with
   stable save-directory names across PCs.
 - **A8** PCGamingWiki data is CC BY-NC-SA 3.0 (unverified). Personal,
@@ -938,7 +995,8 @@ issues.
   re-evaluate once real save sizes are known.
 - **O2** Verify the PCGamingWiki/manifest data licence by hand in a browser
   before phase 2. Also add the matching attribution text.
-- **O3** Whether to sync RPCS3 trophies (`home/*/trophy`) by default.
+- **O3** *(decided in phase 2)* RPCS3 trophies (`home/*/trophy`) are **not**
+  synced by default; they can be added as a manual location.
 - **O4** Which Ryujinx fork is used (the original project was discontinued), and
   how its user profiles map across PCs.
 - **O5** Whether API keys should instead be stored once, encrypted in the

@@ -31,6 +31,15 @@ public sealed class AppConfig
     /// <summary>Folders where games are installed on this PC (used by automatic detection, phase 2).</summary>
     public List<string> LibraryRoots { get; set; } = [];
 
+    /// <summary>
+    /// Bind games that other PCs already sync as soon as their save folder is found here
+    /// (only when it resolves to exactly one existing folder).
+    /// </summary>
+    public bool AutoSetup { get; set; } = true;
+
+    /// <summary>Emulator id → folder of its exe on this PC (e.g. "rpcs3" → "C:\Emulators\RPCS3").</summary>
+    public Dictionary<string, string> EmulatorDirs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>unitId → (locationId → absolute path on this PC).</summary>
     public Dictionary<string, Dictionary<string, string>> Bindings { get; set; } = new(StringComparer.Ordinal);
 

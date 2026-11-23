@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -40,6 +40,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SaveFileSync.Core\SaveFileSync.Core.csproj" />
     <ProjectReference Include="..\SaveFileSync.Repository\SaveFileSync.Repository.csproj" />
+    <ProjectReference Include="..\SaveFileSync.Manifest\SaveFileSync.Manifest.csproj" />
     <ProjectReference Include="..\SaveFileSync.Windows\SaveFileSync.Windows.csproj" />
   </ItemGroup>
 

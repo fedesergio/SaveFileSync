@@ -5,6 +5,7 @@ using SaveFileSync.Core.Config;
 using SaveFileSync.Core.Service;
 using SaveFileSync.Core.State;
 using SaveFileSync.Core.Sync;
+using SaveFileSync.Manifest;
 using SaveFileSync.Repository;
 using SaveFileSync.Windows;
 using Serilog;
@@ -36,6 +37,14 @@ public sealed class AppHost : IDisposable
     public FolderRemoteStore? Remote { get; private set; }
 
     public SyncService? Service { get; private set; }
+
+    /// <summary>Ludusavi manifest cache (PLAN.md §7.3); the index is only loaded while a window needs it.</summary>
+    public ManifestStore Manifest => _manifest ??= new ManifestStore(Paths.CacheDirectory, AppVersion);
+
+    /// <summary>Finds save folders on this PC: known folders, library roots and emulator folders.</summary>
+    public LocationResolver Resolver { get; private set; } = null!;
+
+    private ManifestStore? _manifest;
 
     public static string AppVersion =>
         typeof(AppHost).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "dev";
@@ -87,6 +96,7 @@ public sealed class AppHost : IDisposable
 
         var state = new SqliteLocalState(Paths.StateDatabase);
         var engine = new SyncEngine(Remote, state, Device, SystemClock.Instance, LoggerFactory.CreateLogger<SyncEngine>());
+        Resolver = new LocationResolver(ShellKnownFolders.Get, Config.Snapshot, new WindowsProcessPaths());
         Service = new SyncService(
             engine,
             Config,
@@ -94,7 +104,8 @@ public sealed class AppHost : IDisposable
             new WindowsProcessMonitor(),
             SystemClock.Instance,
             LoggerFactory.CreateLogger<SyncService>(),
-            new SyncServiceOptions { AppVersion = AppVersion });
+            new SyncServiceOptions { AppVersion = AppVersion },
+            Resolver);
         Service.Start();
         _state = state;
     }

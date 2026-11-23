@@ -32,6 +32,10 @@
         </Grid>
 
         <ui:InfoBar x:Name="ActionBar" Margin="0,12,0,0" IsClosable="False" />
+        <ui:InfoBar x:Name="RegistryBar" Margin="0,8,0,0" Severity="Warning" IsClosable="False" IsOpen="False"
+                    Title="Also uses the Windows registry" />
+        <ui:InfoBar x:Name="FolderWarning" Margin="0,8,0,0" Severity="Warning" IsClosable="False" IsOpen="False"
+                    Title="Check these folders" />
         <WrapPanel x:Name="ActionButtons" Margin="0,8,0,0">
           <ui:Button x:Name="ResolveButton" Content="Choose version…" Appearance="Primary" Icon="{ui:SymbolIcon BranchCompare24}" Click="OnResolve" Margin="0,0,8,8" />
           <ui:Button x:Name="RestoreButton" Content="Restore saves from repository" Appearance="Primary" Click="OnRestore" Margin="0,0,8,8" />
@@ -43,6 +47,8 @@
 
         <TextBlock Text="Save folders on this PC" Style="{StaticResource SectionTitle}" />
         <TextBlock x:Name="BindingHint" Style="{StaticResource Secondary}" FontSize="12" />
+        <ui:Button x:Name="AutoDetectButton" Content="Find folders automatically" Icon="{ui:SymbolIcon Search24}"
+                   Click="OnAutoDetect" Margin="0,8,0,0" />
         <ItemsControl x:Name="Locations" Margin="0,8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate>

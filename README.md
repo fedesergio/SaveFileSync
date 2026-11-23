@@ -11,27 +11,43 @@ emulators) in sync across several PCs, using OneDrive as the transport.
   choose which version to keep, and both stay in the history. With
   "per save folder" detection (e.g. RPCS3), different saves changed on
   different PCs are merged automatically.
-- Planned: automatic save-path detection via the
+- Automatic save-path detection via the
   [Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest)
-  (data from [PCGamingWiki](https://www.pcgamingwiki.com)), history browser,
-  cover art, read-only Steam backups.
+  (data from [PCGamingWiki](https://www.pcgamingwiki.com)), with manual paths as
+  a fallback, and presets for RPCS3 and Ryujinx.
+- Planned: history browser and restore, cover art, read-only Steam backups.
 
-**Status:** phase 1b (`v0.2.0`) — manual save folders; conflicts per game,
-per save folder or per file.
+**Status:** phase 2 (`v0.3.0`) — automatic save-folder detection, emulator
+presets, automatic setup on other PCs.
 See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
 
-**Stack:** .NET 10, WPF (WPF-UI), SQLite for local state.
+**Stack:** .NET 10, WPF (WPF-UI), SQLite for local state, YamlDotNet.
 
 ## Using it
 
 1. Run `SaveFileSync.exe`. On first start choose a folder **inside OneDrive**
    (the same one on every PC) and a name for this PC.
-2. *Add game*: pick the save folder(s) and, ideally, the game's process
-   (e.g. `rpcs3.exe`) so nothing is copied while you play. For emulators that
-   keep one folder per game (RPCS3: `dev_hdd0\home\00000001\savedata`), choose
-   *Per save folder* conflict detection; keep *Whole game* for Ryujinx.
-3. On the other PCs the game appears as *Not set up on this PC*: open it, choose
-   where its saves live on that PC, and *Set up on this PC*.
+2. In *Settings*, add the folders where you install games (e.g. `C:\Games`).
+3. *Add game* has three ways in:
+   - **Game database**: search by name. Games whose save folder exists on this
+     PC are marked *Found on this PC*; select one and check what will be synced.
+   - **Emulator**: RPCS3 and Ryujinx. Pick the emulator folder (or leave it empty
+     to search); RPCS3 merges per save folder, Ryujinx is kept as one whole.
+   - **Manual**: choose the folders yourself.
+
+   Add the game's process (e.g. `rpcs3.exe`) so nothing is copied while you play;
+   the database suggests it.
+4. On your other PCs the game shows up by itself. If its save folder is found
+   there (exactly one place), it is set up automatically; otherwise it appears
+   as *Not set up on this PC*: open it and use *Find folders automatically* or
+   *Browse…*. If saves already exist there and differ, you choose which version
+   to keep: nothing is overwritten silently.
+
+Some games also keep data in the Windows registry; that is **not synced** and
+the game is marked accordingly. The game database is the
+[Ludusavi manifest](https://github.com/mtkennerly/ludusavi-manifest), compiled
+from [PCGamingWiki](https://www.pcgamingwiki.com); it is downloaded on your PC
+only (never stored in this repository) for personal, non-commercial use.
 
 The app lives in the notification area. Closing the window does not stop sync;
 use *Exit* in the tray menu.

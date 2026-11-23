@@ -1,6 +1,7 @@
 using SaveFileSync.Core;
 using SaveFileSync.Core.Config;
 using SaveFileSync.Core.Model;
+using SaveFileSync.Core.Paths;
 using SaveFileSync.Core.Service;
 using SaveFileSync.Core.State;
 using SaveFileSync.Core.Sync;
@@ -125,13 +126,16 @@ public sealed class TestPc : IDisposable
 
     public IReadOnlyDictionary<string, string> Bindings => new Dictionary<string, string> { ["saves"] = SavesDir };
 
+    /// <summary>Set before the service is first used, to simulate automatic setup on this PC.</summary>
+    public ILocationResolver? Resolver { get; set; }
+
     public SyncService Service
     {
         get
         {
             if (_service is null)
             {
-                _service = new SyncService(Engine, Config, Device, Processes, Clock, options: new SyncServiceOptions { UseWatchers = false });
+                _service = new SyncService(Engine, Config, Device, Processes, Clock, options: new SyncServiceOptions { UseWatchers = false }, resolver: Resolver);
                 _service.Notification += n => Notifications.Add(n);
             }
 

@@ -11,6 +11,9 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.15" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
 
+    <!-- Manifest -->
+    <PackageVersion Include="YamlDotNet" Version="16.3.0" />
+
     <!-- App -->
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageVersion Include="WPF-UI" Version="4.2.0" />

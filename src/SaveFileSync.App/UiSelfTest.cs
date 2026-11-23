@@ -1,12 +1,32 @@
+using System.Diagnostics;
 using System.Windows;
 using SaveFileSync.App.Views;
 using SaveFileSync.Windows;
 
 namespace SaveFileSync.App;
 
+/// <summary>Collects WPF data-binding errors, which are otherwise only written to a trace log.</summary>
+internal sealed class BindingErrorListener : TraceListener
+{
+    public List<string> Errors { get; } = [];
+
+    public override void Write(string? message)
+    {
+    }
+
+    public override void WriteLine(string? message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            Errors.Add(message.Trim());
+        }
+    }
+}
+
 /// <summary>
 /// Dev-only smoke test (<c>--selftest-ui</c>): XAML is parsed at runtime, so this opens and
-/// closes every window once and reports failures on the console. Exit code 0 = all good.
+/// closes every window once, exercises the add-game flow and reports failures on the console.
+/// Exit code 0 = all good.
 /// </summary>
 internal static class UiSelfTest
 {
@@ -14,6 +34,11 @@ internal static class UiSelfTest
     {
         ConsoleAttach.AttachToParent();
         var failures = 0;
+        var bindings = new BindingErrorListener();
+        PresentationTraceSources.Refresh();
+        PresentationTraceSources.DataBindingSource.Listeners.Add(bindings);
+        PresentationTraceSources.DataBindingSource.Switch.Level = SourceLevels.Warning;
+
         await Task.Delay(TimeSpan.FromSeconds(2)); // let the service publish a first status
 
         var unitId = host.Service!.CurrentStatus.FirstOrDefault()?.UnitId;
@@ -39,6 +64,16 @@ internal static class UiSelfTest
                 window.ShowActivated = false;
                 window.Show();
                 await Task.Delay(500);
+
+                if (window is AddUnitWindow add)
+                {
+                    foreach (var problem in await add.SelfTestAsync())
+                    {
+                        failures++;
+                        Console.WriteLine($"FAIL  {name}: {problem}");
+                    }
+                }
+
                 window.Close();
                 Console.WriteLine($"OK    {name}");
             }
@@ -48,6 +83,12 @@ internal static class UiSelfTest
                 Console.WriteLine($"FAIL  {name}: {ex.GetType().Name}: {ex.Message}");
                 Serilog.Log.Error(ex, "UI self-test failed for {Window}", name);
             }
+        }
+
+        foreach (var error in bindings.Errors.Distinct())
+        {
+            failures++;
+            Console.WriteLine($"FAIL  binding: {error}");
         }
 
         Console.WriteLine(failures == 0 ? "UI self-test passed." : $"UI self-test: {failures} failure(s).");

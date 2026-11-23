@@ -3,7 +3,7 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="Add game"
-                 Width="720" Height="680"
+                 Width="780" Height="820"
                  WindowStartupLocation="CenterOwner"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica">
@@ -17,12 +17,70 @@
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
       <StackPanel Margin="24,0,24,8">
-        <TextBlock Text="Name" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
-        <ui:TextBox x:Name="GameName" PlaceholderText="e.g. Hollow Knight, RPCS3" TextChanged="OnChanged" />
+
+        <TextBlock Text="1. Find the game" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+        <TabControl x:Name="Modes" SelectionChanged="OnModeChanged">
+          <!-- Game database -->
+          <TabItem Header="Game database">
+            <StackPanel Margin="0,12,0,0">
+              <ui:TextBox x:Name="SearchBox" PlaceholderText="Search by name, e.g. Hollow Knight" TextChanged="OnSearchChanged" />
+              <ProgressBar x:Name="DatabaseProgress" IsIndeterminate="True" Height="3" Margin="0,8,0,0" Visibility="Collapsed" />
+              <TextBlock x:Name="DatabaseStatus" Style="{StaticResource Secondary}" FontSize="12" Margin="0,6,0,6" />
+              <ListBox x:Name="Results" Height="190" SelectionChanged="OnResultSelected">
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <Border Grid.Column="1" Style="{StaticResource Chip}" Background="#2E9E5B" Margin="8,0,0,0"
+                              Visibility="{Binding Detected, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Found on this PC" Foreground="White" FontSize="11" />
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel>
+          </TabItem>
+
+          <!-- Emulators -->
+          <TabItem Header="Emulator">
+            <StackPanel Margin="0,12,0,0">
+              <ComboBox x:Name="PresetBox" SelectionChanged="OnPresetChanged" />
+              <TextBlock x:Name="PresetSummary" Style="{StaticResource Secondary}" FontSize="12" Margin="0,6,0,0" />
+              <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ui:TextBox x:Name="EmulatorFolder" PlaceholderText="Folder of the emulator (where its exe is) — leave empty to search" />
+                <ui:Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowseEmulator" />
+                <ui:Button Grid.Column="2" Content="Detect" Appearance="Primary" Margin="8,0,0,0" Click="OnDetectEmulator" />
+              </Grid>
+              <TextBlock x:Name="PresetStatus" Style="{StaticResource Secondary}" FontSize="12" Margin="0,6,0,0" />
+            </StackPanel>
+          </TabItem>
+
+          <!-- Manual -->
+          <TabItem Header="Manual">
+            <TextBlock Style="{StaticResource Secondary}" Margin="0,12,0,4"
+                       Text="Choose the save folders yourself in the next step. Other PCs will need you to choose their folders too, because nothing identifies the game." />
+          </TabItem>
+        </TabControl>
+
+        <TextBlock Text="2. Check what will be synced" Style="{StaticResource SectionTitle}" />
+        <ui:TextBox x:Name="GameName" PlaceholderText="Name, e.g. Hollow Knight, RPCS3" TextChanged="OnChanged" />
+
+        <ui:InfoBar x:Name="RegistryBar" Margin="0,8,0,0" Severity="Warning" IsClosable="False" IsOpen="False"
+                    Title="Also uses the Windows registry" />
 
         <TextBlock Text="Save folders on this PC" Style="{StaticResource SectionTitle}" />
         <TextBlock Style="{StaticResource Secondary}" FontSize="12"
-                   Text="Everything inside these folders is synced, except what matches the excludes (globs relative to the folder, separated by ';', e.g. logs/**; *.tmp)." />
+                   Text="Everything inside the checked folders is synced, except what matches the excludes (globs relative to the folder, separated by ';', e.g. logs/**; *.tmp)." />
         <ItemsControl x:Name="Locations" Margin="0,8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
@@ -33,7 +91,10 @@
                     <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
                   <StackPanel>
-                    <TextBlock Text="{Binding Path}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <CheckBox IsChecked="{Binding IsSelected}" Checked="OnChanged" Unchecked="OnChanged">
+                      <TextBlock Text="{Binding Path}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    </CheckBox>
+                    <TextBlock Text="{Binding Info}" Style="{StaticResource Secondary}" FontSize="12" Margin="28,0,0,0" />
                     <Grid Margin="0,8,0,0">
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
