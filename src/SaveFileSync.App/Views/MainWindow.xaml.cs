@@ -72,6 +72,9 @@ public partial class MainWindow : FluentWindow
         new AddUnitWindow(_host) { Owner = this }.ShowDialog();
     }
 
+    private void OnAddSteam(object sender, RoutedEventArgs e) =>
+        new AddSteamWindow(_host) { Owner = this }.ShowDialog();
+
     private void OnActivity(object sender, RoutedEventArgs e) =>
         new ActivityWindow(_host) { Owner = this }.Show();
 

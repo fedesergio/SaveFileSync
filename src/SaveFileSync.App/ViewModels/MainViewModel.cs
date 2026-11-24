@@ -19,6 +19,10 @@ public sealed partial class UnitItemViewModel : ObservableObject
     [ObservableProperty]
     private string _detail = "";
 
+    /// <summary>A Steam game backed up read-only (phase 5).</summary>
+    [ObservableProperty]
+    private bool _isBackupOnly;
+
     [ObservableProperty]
     private string _lastSyncText = "";
 
@@ -70,6 +74,7 @@ public sealed partial class UnitItemViewModel : ObservableObject
         _ = SetCoverAsync(coverPath);
         Name = status.Name;
         State = status.State;
+        IsBackupOnly = status.IsBackupOnly;
         _baseDetail = status.Detail;
         _quietUntil = status.QuietUntilUtc;
         var last = status.LastSyncUtc is { } t ? $"Last sync {t.ToLocalTime():g}" : "Never synced on this PC";
@@ -117,6 +122,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _isGridView;
+
+    /// <summary>0 = all games, 1 = synced games, 2 = Steam backups.</summary>
+    [ObservableProperty]
+    private int _filterIndex;
+
+    [ObservableProperty]
+    private bool _hasSteamUnits;
 
     /// <summary>Attribution line, shown while at least one cover is displayed.</summary>
     [ObservableProperty]
@@ -179,6 +191,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleView() => IsGridView = !IsGridView;
 
+    partial void OnFilterIndexChanged(int value)
+    {
+        if (!_loading)
+        {
+            Apply(_service.CurrentStatus);
+        }
+    }
+
     partial void OnIsGridViewChanged(bool value)
     {
         if (!_loading)
@@ -223,7 +243,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void Apply(IReadOnlyList<UnitStatus> status)
     {
+        HasSteamUnits = status.Any(s => s.IsBackupOnly);
+        if (!HasSteamUnits && FilterIndex != 0)
+        {
+            FilterIndex = 0;
+        }
+
         var ordered = status
+            .Where(s => FilterIndex == 0 || (FilterIndex == 2) == s.IsBackupOnly)
             .OrderBy(s => s.IsBound ? 0 : 1)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();

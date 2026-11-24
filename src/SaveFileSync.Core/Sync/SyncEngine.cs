@@ -88,6 +88,11 @@ public sealed class SyncEngine
             return recovered;
         }
 
+        if (unit.Mode == UnitMode.BackupOnly)
+        {
+            return BackupSync(unit, bindings, options);
+        }
+
         var pushed = false;
         for (var i = 0; i < MaxPlanIterations; i++)
         {
@@ -195,6 +200,59 @@ public sealed class SyncEngine
 
         _log.LogWarning("Unit {Unit}: plan did not settle after {N} iterations", unit.UnitId, MaxPlanIterations);
         return SyncResult.Of(SyncResultKind.Unstable);
+    }
+
+    /// <summary>
+    /// Backup-only units (Steam, PLAN.md §11 phase 5): this PC adds versions to its own chain and never
+    /// pulls, merges or conflicts. Versions from other PCs are only listed (several tips are expected).
+    /// </summary>
+    private SyncResult BackupSync(UnitDefinition unit, IReadOnlyDictionary<string, string> bindings, SyncOptions options)
+    {
+        var scan = _scanner.Scan(unit, bindings);
+        if (scan.MissingLocations.Count > 0)
+        {
+            return SyncResult.Of(SyncResultKind.LocationMissing, string.Join(", ", scan.MissingLocations));
+        }
+
+        if (scan.Unstable)
+        {
+            return SyncResult.Of(SyncResultKind.Unstable);
+        }
+
+        var (graph, incomplete) = LoadGraph(unit.UnitId);
+        var unitState = _state.GetUnitState(unit.UnitId);
+        var ownBase = graph.Get(unitState?.BaseVersionId);
+
+        // An emptied folder is never backed up as "empty": it keeps the earlier versions as they are.
+        if (scan.Snapshot.IsEmpty)
+        {
+            return SyncResult.Of(SyncResultKind.UpToDate);
+        }
+
+        if (ownBase is not null && scan.Snapshot.ContentEquals(ownBase.Content))
+        {
+            return SyncResult.Of(SyncResultKind.UpToDate);
+        }
+
+        // The same content is already backed up (e.g. by another PC): adopt it instead of storing it twice.
+        if (ownBase is null && graph.Tips.FirstOrDefault(t => scan.Snapshot.ContentEquals(t.Content)) is { } same)
+        {
+            SetBase(unit.UnitId, same.VersionId);
+            return SyncResult.Of(SyncResultKind.UpToDate);
+        }
+
+        if (!options.AllowPush)
+        {
+            return SyncResult.Of(SyncResultKind.PushDeferred);
+        }
+
+        IReadOnlyList<string> parents = ownBase is null ? [] : [ownBase.VersionId];
+        if (!PushVersion(unit.UnitId, scan, parents, ownBase is null ? VersionKind.Initial : VersionKind.Normal, note: null))
+        {
+            return SyncResult.Of(SyncResultKind.Unstable);
+        }
+
+        return incomplete > 0 ? SyncResult.Of(SyncResultKind.Pushed, $"{incomplete} version(s) still arriving") : SyncResult.Of(SyncResultKind.Pushed);
     }
 
     /// <summary>The recorded conflict of a unit, if any.</summary>
@@ -375,12 +433,14 @@ public sealed class SyncEngine
             return Refused("The contents of that version are not fully available yet (OneDrive may still be syncing).");
         }
 
-        if (graph.Tips.Count != 1)
+        var backupOnly = unit.Mode == UnitMode.BackupOnly;
+        if (!backupOnly && graph.Tips.Count != 1)
         {
             return Refused("Another PC has changes that are not merged yet. Let them sync first.");
         }
 
-        var tip = graph.Tips[0];
+        // Backup-only: the restore continues this PC's own chain; other PCs' versions are not touched.
+        var tip = backupOnly ? graph.Get(_state.GetUnitState(unit.UnitId)?.BaseVersionId) ?? graph.Tips[0] : graph.Tips[0];
         if (target.Content.ContentEquals(tip.Content))
         {
             return SyncResult.Of(SyncResultKind.UpToDate, "That is already the current version.");

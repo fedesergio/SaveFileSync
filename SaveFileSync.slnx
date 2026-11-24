@@ -4,6 +4,7 @@
     <Project Path="src/SaveFileSync.Repository/SaveFileSync.Repository.csproj" />
     <Project Path="src/SaveFileSync.Manifest/SaveFileSync.Manifest.csproj" />
     <Project Path="src/SaveFileSync.Metadata/SaveFileSync.Metadata.csproj" />
+    <Project Path="src/SaveFileSync.Steam/SaveFileSync.Steam.csproj" />
     <Project Path="src/SaveFileSync.Windows/SaveFileSync.Windows.csproj" />
     <Project Path="src/SaveFileSync.App/SaveFileSync.App.csproj" />
   </Folder>
@@ -11,6 +12,7 @@
     <Project Path="tests/SaveFileSync.Core.Tests/SaveFileSync.Core.Tests.csproj" />
     <Project Path="tests/SaveFileSync.Manifest.Tests/SaveFileSync.Manifest.Tests.csproj" />
     <Project Path="tests/SaveFileSync.Metadata.Tests/SaveFileSync.Metadata.Tests.csproj" />
+    <Project Path="tests/SaveFileSync.Steam.Tests/SaveFileSync.Steam.Tests.csproj" />
     <Project Path="tests/SaveFileSync.Simulation.Tests/SaveFileSync.Simulation.Tests.csproj" />
   </Folder>
   <Folder Name="/solution/">

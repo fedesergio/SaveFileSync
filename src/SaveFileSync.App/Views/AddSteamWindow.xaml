@@ -1,0 +1,57 @@
+<ui:FluentWindow x:Class="SaveFileSync.App.Views.AddSteamWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Back up Steam games"
+                 Width="820" Height="680" MinWidth="620" MinHeight="460"
+                 WindowStartupLocation="CenterOwner"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <ui:TitleBar Title="Back up Steam games" ShowMaximize="False" ShowMinimize="False" />
+
+    <Grid Grid.Row="1" Margin="24,0,24,8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <StackPanel>
+        <TextBlock Text="Back up Steam games" FontSize="22" FontWeight="SemiBold" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
+                   Text="Steam games are backed up read-only: each PC adds its own versions to the history. SaveFileSync never changes Steam's folders by itself and never pulls saves into them; restoring is only done by you, from the game's History window, with Steam closed." />
+      </StackPanel>
+      <ui:InfoBar x:Name="Notice" Grid.Row="1" Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="False" />
+      <ProgressBar x:Name="Progress" Grid.Row="1" IsIndeterminate="True" Height="3" VerticalAlignment="Bottom" />
+      <ListBox x:Name="Games" Grid.Row="2" Margin="0,8,0,0" HorizontalContentAlignment="Stretch">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Grid Margin="0,4" IsEnabled="{Binding CanSelect}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <CheckBox IsChecked="{Binding IsChecked}" VerticalAlignment="Center" MinWidth="0" Margin="0,0,8,0" AutomationProperties.Name="{Binding Name}" />
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" FontSize="12" />
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock x:Name="Summary" Grid.Row="3" Style="{StaticResource Secondary}" FontSize="12" Margin="0,8,0,0" />
+    </Grid>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="24,8,24,16">
+      <ui:Button Content="Close" Click="OnClose" Margin="0,0,8,0" />
+      <ui:Button x:Name="AddButton" Content="Back up selected" Appearance="Primary" Click="OnAdd" />
+    </StackPanel>
+  </Grid>
+</ui:FluentWindow>

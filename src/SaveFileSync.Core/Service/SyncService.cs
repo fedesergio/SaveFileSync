@@ -192,7 +192,8 @@ public sealed class SyncService : IDisposable
         IReadOnlyList<string> processNames,
         IReadOnlyDictionary<string, string> bindings,
         MergeGranularity granularity = MergeGranularity.Unit,
-        UnitSource? source = null) =>
+        UnitSource? source = null,
+        UnitMode mode = UnitMode.Sync) =>
         Invoke(() =>
         {
             var unitId = NewUnitId(name);
@@ -204,6 +205,7 @@ public sealed class SyncService : IDisposable
                 ProcessNames = processNames.Select(NormalizeProcessName).Where(p => p.Length > 0).Distinct().ToList(),
                 Granularity = granularity,
                 Source = source,
+                Mode = mode,
                 KeepVersions = Math.Clamp(Config.DefaultKeepVersions, 1, 1000),
                 Revision = 1,
                 RevisionDevice = _device.ShortId,
@@ -328,7 +330,10 @@ public sealed class SyncService : IDisposable
 
     /// <summary>Restores an older version; every PC receives it as a normal change (PLAN.md §11, phase 3).</summary>
     public Task<SyncResult> RestoreVersionAsync(string unitId, string versionId) =>
-        RunUnitCommand(unitId, (def, bindings) => _engine.RestoreVersion(def, bindings, versionId));
+        RunUnitCommand(unitId, (def, bindings) =>
+            def.Mode == UnitMode.BackupOnly && _processes.GetRunningProcessNames().Contains("steam")
+                ? SyncResult.Of(SyncResultKind.Refused, "Close Steam first: it would overwrite the restored saves or raise a Cloud conflict.")
+                : _engine.RestoreVersion(def, bindings, versionId));
 
     /// <summary>Changes how many versions stay restorable for a game; shared by all PCs.</summary>
     public Task SetKeepVersionsAsync(string unitId, int keep) => Invoke(() =>
@@ -1201,7 +1206,7 @@ public sealed class SyncService : IDisposable
 
         public UnitStatus LastStatus(SyncService owner)
         {
-            var status = new UnitStatus(UnitId, Definition.Name, State, Detail, LastSyncUtc, LastChangeDevice, QuietUntil, Busy, IsBound, Conflict, HasRegistryData);
+            var status = new UnitStatus(UnitId, Definition.Name, State, Detail, LastSyncUtc, LastChangeDevice, QuietUntil, Busy, IsBound, Conflict, HasRegistryData, Definition.Mode == UnitMode.BackupOnly);
             if (_last is not null && _last == status)
             {
                 return _last;

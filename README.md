@@ -19,10 +19,11 @@ emulators) in sync across several PCs, using OneDrive as the transport.
   number of versions kept (older ones are archived and cleaned up carefully).
 - Covers (SteamGridDB) and official names (IGDB), optional, with your own free
   keys; list or grid view.
-- Planned: read-only Steam backups.
+- Read-only backup of Steam games (Steam Cloud and Auto-Cloud saves) with the same history;
+  Steam's folders are never changed unless you restore a version yourself.
 
-**Status:** phase 4 (`v0.5.0`) — covers and official names, on top of history and
-restore, retention, devices (phase 3) and automatic detection with emulator
+**Status:** phase 5 (`v0.6.0`) — Steam read-only backup, on top of covers and official
+names (phase 4), history and restore (phase 3) and automatic detection with emulator
 presets (phase 2).
 See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
 
@@ -47,6 +48,15 @@ See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
    as *Not set up on this PC*: open it and use *Find folders automatically* or
    *Browse…*. If saves already exist there and differ, you choose which version
    to keep: nothing is overwritten silently.
+
+## Steam games (read-only backup)
+
+The **Steam** button lists the Steam games on this PC that have saves, from Steam's own
+`userdata` folder and, with the game database downloaded, from the folders games use for
+Steam Auto-Cloud. Tick the ones to back up. Each PC only **adds its own versions** to the
+history: nothing is ever pulled into Steam's folders or merged, so Steam Cloud stays in charge.
+To bring an old version back, open the game, *History and restore…*, with Steam closed;
+Steam may then show a Cloud conflict at its next start: keep the local copy.
 
 ## Covers and official names (optional)
 

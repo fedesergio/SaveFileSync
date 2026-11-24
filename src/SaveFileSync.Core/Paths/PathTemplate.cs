@@ -54,6 +54,9 @@ public sealed class ResolveContext
 
     /// <summary>Install folder names of the game (<c>&lt;game&gt;</c>, and <c>&lt;base&gt;</c> = root + name).</summary>
     public IReadOnlyList<string> InstallDirs { get; init; } = [];
+
+    /// <summary>Steam's <c>userdata\&lt;account&gt;</c> folders on this PC (<c>&lt;steamUserdata&gt;</c>, phase 5).</summary>
+    public IReadOnlyList<string> SteamUserdataDirs { get; init; } = [];
 }
 
 /// <summary>
@@ -103,6 +106,11 @@ public static class PathTemplate
         if (t.Contains("<base>", StringComparison.Ordinal))
         {
             results = ExpandWith(results, "<base>", BaseFolders(ctx));
+        }
+
+        if (t.Contains("<steamUserdata>", StringComparison.Ordinal))
+        {
+            results = ExpandWith(results, "<steamUserdata>", ctx.SteamUserdataDirs.Select(Slash));
         }
 
         if (t.Contains("<root>", StringComparison.Ordinal))

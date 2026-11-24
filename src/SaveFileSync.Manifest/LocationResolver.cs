@@ -13,20 +13,32 @@ public sealed class LocationResolver : ILocationResolver
     private readonly Func<KnownFolderSet> _folders;
     private readonly Func<AppConfig> _config;
     private readonly IProcessPaths? _processes;
+    private readonly Func<(IReadOnlyList<string> CommonDirs, IReadOnlyList<string> UserdataDirs)>? _steam;
 
-    public LocationResolver(Func<KnownFolderSet> folders, Func<AppConfig> config, IProcessPaths? processes = null)
+    /// <param name="steam">Steam's game folders and <c>userdata</c> account folders on this PC, if Steam is installed.</param>
+    public LocationResolver(
+        Func<KnownFolderSet> folders,
+        Func<AppConfig> config,
+        IProcessPaths? processes = null,
+        Func<(IReadOnlyList<string> CommonDirs, IReadOnlyList<string> UserdataDirs)>? steam = null)
     {
+        _steam = steam;
         _folders = folders;
         _config = config;
         _processes = processes;
     }
 
-    public ResolveContext CreateContext(IReadOnlyList<string>? installDirs = null) => new()
+    public ResolveContext CreateContext(IReadOnlyList<string>? installDirs = null, bool includeSteam = false)
     {
-        Folders = _folders(),
-        LibraryRoots = _config().LibraryRoots,
-        InstallDirs = installDirs ?? [],
-    };
+        var steam = includeSteam ? _steam?.Invoke() : null;
+        return new ResolveContext
+        {
+            Folders = _folders(),
+            LibraryRoots = steam is null ? _config().LibraryRoots : [.. _config().LibraryRoots, .. steam.Value.CommonDirs],
+            InstallDirs = installDirs ?? [],
+            SteamUserdataDirs = steam?.UserdataDirs ?? [],
+        };
+    }
 
     public IReadOnlyDictionary<string, string>? TryResolve(UnitDefinition unit)
     {
@@ -72,7 +84,7 @@ public sealed class LocationResolver : ILocationResolver
 
     private IReadOnlyDictionary<string, string>? ResolveTemplates(UnitDefinition unit)
     {
-        var ctx = CreateContext(unit.Source?.InstallDirs);
+        var ctx = CreateContext(unit.Source?.InstallDirs, includeSteam: unit.Source?.Kind == UnitSource.SteamKind);
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var location in unit.Locations)
         {

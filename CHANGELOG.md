@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-11-24 — Phase 5
+
+### Added
+- **Steam read-only backup**: *Steam* button lists games with saves in Steam's `userdata`
+  (Cloud) or in the folders the game database knows (Auto-Cloud, cross-checked with
+  `remotecache.vdf`), and adds them in a new `backupOnly` mode.
+- Each PC adds versions to its own history chain; it never pulls, merges or conflicts, and an
+  emptied folder is never backed up as empty. Same history, retention and cleanup as other games.
+- Restore for Steam games only on request, refused while the game or Steam runs, with a
+  warning about Steam's Cloud conflict dialog.
+- *Steam · backup only* badge and a filter in the library (list and grid).
+- Steam games added on one PC are set up on others automatically when their folder is unambiguous.
+
+### Notes
+- Nothing is ever written into Steam's folders except by an explicit restore.
+
 ## [0.5.0] — 2026-11-24 — Phase 4
 
 ### Added

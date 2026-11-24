@@ -1,6 +1,6 @@
 # SaveFileSync — Plan
 
-Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`), phase 3 (`v0.4.0`), phase 4 (`v0.5.0`)
+Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`), phase 3 (`v0.4.0`), phase 4 (`v0.5.0`), phase 5 (`v0.6.0`)
 
 SaveFileSync is a personal Windows tool that keeps game saves in sync across
 several PCs (Windows 11 desktop, ROG Xbox Ally X, future machines) using the
@@ -83,13 +83,14 @@ src/
   SaveFileSync.Windows/          # known folders, OneDrive detection/pinning, process monitor,
                                  # autostart, DPAPI, registry, Controlled Folder Access checks
   SaveFileSync.Metadata/         # SteamGridDB / IGDB clients, name matching, cover cache (phase 4)
-  SaveFileSync.Steam/            # (phase 5) Steam library/userdata discovery, read-only backup
+  SaveFileSync.Steam/            # Steam library/userdata discovery, VDF parser, backup finder (phase 5)
   SaveFileSync.App/              # WPF app, tray, views, composition root
 tests/
   SaveFileSync.Core.Tests/
   SaveFileSync.Repository.Tests/
   SaveFileSync.Manifest.Tests/
   SaveFileSync.Metadata.Tests/   # API clients against fake HTTP, DPAPI store, matching
+  SaveFileSync.Steam.Tests/      # VDF, library discovery, backup finder on synthetic Steam folders
   SaveFileSync.Simulation.Tests/ # two-PC simulation (see §10)
 ```
 
@@ -1014,6 +1015,40 @@ blobs, unreadable files, stale marks).
   - Steam units get a "Steam · backup only" badge and their own filter;
   - a game owned both on Steam and DRM-free is decided by where it is installed
     on each PC. The user can override this.
+
+#### Implemented in phase 5
+
+- **Discovery** (`SaveFileSync.Steam`, read-only): `HKCU\Software\Valve\Steam\SteamPath`,
+  `libraryfolders.vdf`, `appmanifest_*.acf`, `userdata\<account>` (placeholder `0` ignored).
+  A tolerant text-VDF parser returns `null` for half-written files.
+- **What is backed up** (`SteamBackupFinder`), per game:
+  1. `userdata\<account>\<appid>\remote` (Steam Cloud API saves) as location `steam-cloud`,
+     template `<steamUserdata>/<appid>/remote`. With several accounts the most recently
+     used one is bound here; on another PC an ambiguous account is left for the user.
+  2. Manifest save folders matched by Steam id (Auto-Cloud games), found with the
+     game's Steam `common` folders as library roots, cross-checked against the file
+     names in `remotecache.vdf` (shown as *tracked by Steam Cloud* or *not confirmed*).
+  Steam's own pseudo-apps (client 7, screenshots 760, controller configs 241100) are skipped.
+  Games without any save file are not listed. Uninstalled games whose saves remain in
+  `userdata` are listed too (named from the manifest when it is downloaded).
+- **Mode `backupOnly`** (`SyncEngine.BackupSync`): this PC adds versions to **its own chain**
+  and never pulls, merges or conflicts; other PCs' versions are only listed (one tip
+  per PC). Rules: an emptied folder is never backed up as empty; identical content that
+  another PC already stored is adopted instead of stored again; pushes wait for the game
+  to close like any other unit.
+- **Restore** only from the game's History window, on request: refused while the game or
+  `steam.exe` runs; it continues this PC's chain with a `restore` version (other PCs are
+  untouched); the confirmation warns about Steam's Cloud conflict dialog (choose the local copy).
+- **GUI:** *Steam* button → *Back up Steam games* (list with checkboxes, tracked-by-Cloud
+  ones preselected, already-added ones disabled); a *Steam · backup only* badge in list and
+  grid; a filter (all / synced / Steam backup) appears once a Steam game exists.
+- **Other PCs:** a Steam unit is bound automatically when its folder resolves to exactly one
+  place (`<steamUserdata>` expands to each account folder; Steam `common` folders are added to
+  the library roots for `<base>`).
+- **Not done / open:** the DRM-free vs Steam override for the same game (add it as a normal
+  game from the database instead); `appinfo.vdf` (O7) is still not parsed. The game list
+  shows Steam apps found on the dev PC correctly (read-only run), but a real two-PC
+  Steam test has not been done.
 
 ### Phase 6 — Registry saves (only if needed) → `v0.7.0`
 

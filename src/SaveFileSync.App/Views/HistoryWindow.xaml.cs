@@ -162,10 +162,17 @@ public partial class HistoryWindow : FluentWindow
             return;
         }
 
+        var steamBackup = _host.Service!.GetDefinition(_unitId)?.Mode == UnitMode.BackupOnly;
         var answer = MessageBox.Show(this,
-            $"Restore the version saved {row.When} ({row.From})?\n\n" +
-            "The saves on this PC, and then on all your other PCs, will be replaced by it. " +
-            "The version they replace stays in the history, so you can undo this.",
+            steamBackup
+                ? $"Restore the version saved {row.When} ({row.From}) into Steam's save folder on this PC?\n\n" +
+                  "Steam must be closed. Only this PC is changed; your other PCs keep their own backups. " +
+                  "The version it replaces stays in the history.\n\n" +
+                  "Heads-up: at its next start Steam may report a Cloud conflict for this game. " +
+                  "Choose to keep the LOCAL copy, otherwise Steam replaces the restored saves with its cloud copy."
+                : $"Restore the version saved {row.When} ({row.From})?\n\n" +
+                  "The saves on this PC, and then on all your other PCs, will be replaced by it. " +
+                  "The version they replace stays in the history, so you can undo this.",
             "Restore version", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes)
         {

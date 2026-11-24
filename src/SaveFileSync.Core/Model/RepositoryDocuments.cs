@@ -107,6 +107,9 @@ public sealed class UnitSource
     public const string ManifestKind = "manifest";
     public const string PresetKind = "preset";
 
+    /// <summary>A Steam game backed up read-only (phase 5).</summary>
+    public const string SteamKind = "steam";
+
     public string Kind { get; init; } = ManualKind;
 
     /// <summary>Game name in the Ludusavi manifest.</summary>

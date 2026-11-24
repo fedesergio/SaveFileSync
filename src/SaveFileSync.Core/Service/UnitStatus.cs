@@ -34,7 +34,8 @@ public sealed record UnitStatus(
     bool GameRunning,
     bool IsBound,
     ConflictInfo? Conflict,
-    bool HasRegistryData = false);
+    bool HasRegistryData = false,
+    bool IsBackupOnly = false);
 
 public enum NotificationLevel
 {

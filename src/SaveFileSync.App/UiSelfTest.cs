@@ -50,6 +50,7 @@ internal static class UiSelfTest
             ("SettingsWindow", () => new SettingsWindow(host)),
             ("ActivityWindow", () => new ActivityWindow(host)),
             ("DevicesWindow", () => new DevicesWindow(host)),
+            ("AddSteamWindow", () => new AddSteamWindow(host)),
         };
         if (unitId is not null)
         {

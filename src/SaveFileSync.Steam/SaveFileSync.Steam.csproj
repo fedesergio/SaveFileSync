@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SaveFileSync.Steam</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SaveFileSync.Core\SaveFileSync.Core.csproj" />
+    <ProjectReference Include="..\SaveFileSync.Manifest\SaveFileSync.Manifest.csproj" />
+  </ItemGroup>
+
+</Project>

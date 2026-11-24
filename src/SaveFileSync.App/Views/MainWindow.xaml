@@ -26,7 +26,12 @@
             </Grid>
           </Border>
           <StackPanel Grid.Column="1" VerticalAlignment="Center">
-            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
+              <Border Style="{StaticResource Chip}" Background="#3B5E8C" Padding="8,1" Margin="8,0,0,0" Visibility="{Binding IsBackupOnly, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Steam · backup only" Foreground="White" FontSize="11" />
+              </Border>
+            </StackPanel>
             <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" Margin="0,2,0,0" />
             <TextBlock Text="{Binding LastSyncText}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0" />
             <TextBlock Text="{Binding Note}" Foreground="#D9821E" FontSize="12" TextWrapping="Wrap" />
@@ -77,6 +82,7 @@
             </Border.Background>
             <StackPanel>
               <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="Steam · backup only" Foreground="#9FC1F0" FontSize="11" Visibility="{Binding IsBackupOnly, Converter={StaticResource BoolToVisibility}}" />
               <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                 <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
                 <TextBlock Text="{Binding State, Converter={StaticResource StateToText}}" Foreground="#DDFFFFFF" FontSize="11" />
@@ -107,9 +113,17 @@
       <StackPanel VerticalAlignment="Center">
         <TextBlock Text="Library" FontSize="24" FontWeight="SemiBold" />
         <TextBlock Text="{Binding Summary}" Style="{StaticResource Secondary}" Margin="0,4,0,0" />
+        <ComboBox SelectedIndex="{Binding FilterIndex}" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0"
+                  Visibility="{Binding HasSteamUnits, Converter={StaticResource BoolToVisibility}}"
+                  AutomationProperties.Name="Filter games">
+          <ComboBoxItem Content="All games" />
+          <ComboBoxItem Content="Synced games" />
+          <ComboBoxItem Content="Steam · backup only" />
+        </ComboBox>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <ui:Button Content="Add game" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Click="OnAddGame" Margin="0,0,8,0" />
+        <ui:Button Content="Steam" Icon="{ui:SymbolIcon CloudArrowUp24}" ToolTip="Back up Steam games (read-only)" Click="OnAddSteam" Margin="0,0,8,0" />
         <ui:Button Content="Sync all now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncAllCommand}" Margin="0,0,8,0" />
         <ui:Button Command="{Binding ToggleViewCommand}" Margin="0,0,8,0" AutomationProperties.Name="Switch between list and grid">
           <ui:Button.Style>

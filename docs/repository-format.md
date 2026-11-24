@@ -81,6 +81,11 @@ public identifiers, never keys or paths:
 Each PC downloads the cover from `coverUrl` into its own cache; the repository
 never contains images.
 
+Steam units (phase 5) have `"mode": "backupOnly"` and `"source": { "kind": "steam", "steamId": ... }`.
+Their cloud location uses the template `<steamUserdata>/<appid>/remote`, where
+`<steamUserdata>` stands for each `userdata\<account>` folder of the PC. In this mode every PC only
+adds versions that descend from its own previous version; versions of other PCs are never applied.
+
 `templates` say where another PC should look for the folder, with tokens such
 as `<winAppData>`, `<winLocalAppData>`, `<winDocuments>`, `<home>` and
 `<base>` (= a library folder plus one of `installDirs`). They contain no

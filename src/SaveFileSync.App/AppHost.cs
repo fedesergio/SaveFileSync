@@ -9,6 +9,7 @@ using SaveFileSync.Core.State;
 using SaveFileSync.Core.Sync;
 using SaveFileSync.Manifest;
 using SaveFileSync.Metadata;
+using SaveFileSync.Steam;
 using SaveFileSync.Repository;
 using SaveFileSync.Windows;
 using Serilog;
@@ -115,7 +116,11 @@ public sealed class AppHost : IDisposable
 
         var state = new SqliteLocalState(Paths.StateDatabase);
         var engine = new SyncEngine(Remote, state, Device, SystemClock.Instance, LoggerFactory.CreateLogger<SyncEngine>());
-        Resolver = new LocationResolver(ShellKnownFolders.Get, Config.Snapshot, new WindowsProcessPaths());
+        Resolver = new LocationResolver(
+            ShellKnownFolders.Get,
+            Config.Snapshot,
+            new WindowsProcessPaths(),
+            () => CurrentSteam() is { } steam ? (steam.CommonDirs.ToList(), steam.UserdataDirs.ToList()) : ([], []));
         Service = new SyncService(
             engine,
             Config,
@@ -151,6 +156,23 @@ public sealed class AppHost : IDisposable
     }
 
     private SqliteLocalState? _state;
+    private SteamInstall? _steam;
+    private DateTime _steamReadUtc;
+
+    /// <summary>This PC's Steam installation (read-only), re-read at most once a minute; null if Steam is not installed.</summary>
+    public SteamInstall? CurrentSteam(bool refresh = false)
+    {
+        lock (this)
+        {
+            if (refresh || DateTime.UtcNow - _steamReadUtc > TimeSpan.FromMinutes(1))
+            {
+                _steam = SteamInstall.Discover(SteamRegistry.GetSteamPath());
+                _steamReadUtc = DateTime.UtcNow;
+            }
+
+            return _steam;
+        }
+    }
 
     public void Dispose()
     {
