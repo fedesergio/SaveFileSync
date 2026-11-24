@@ -1,0 +1,94 @@
+<ui:FluentWindow x:Class="SaveFileSync.App.Views.CoverPickerWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Cover and match"
+                 Width="900" Height="760" MinWidth="700" MinHeight="560"
+                 WindowStartupLocation="CenterOwner"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <ui:TitleBar Title="Cover and match" ShowMaximize="False" ShowMinimize="False" />
+
+    <Grid Grid.Row="1" Margin="24,0,24,8">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <StackPanel>
+        <TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
+                   Text="The match was found automatically from the game's name. Pick the right game and the cover you like; your choice is kept and shared with your other PCs." />
+      </StackPanel>
+
+      <ui:InfoBar x:Name="NoKeyBar" Grid.Row="1" Margin="0,8,0,0" Severity="Informational" IsClosable="False" IsOpen="False"
+                  Title="No key set on this PC"
+                  Message="Add a SteamGridDB key (covers) and/or IGDB credentials (official names) in Settings to search here." />
+
+      <Grid Grid.Row="2" Margin="0,12,0,8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ui:TextBox x:Name="SearchBox" PlaceholderText="Game name" KeyDown="OnSearchKeyDown" />
+        <ui:Button Grid.Column="1" x:Name="SearchButton" Content="Search" Icon="{ui:SymbolIcon Search24}" Click="OnSearch" Margin="8,0,0,0" />
+      </Grid>
+
+      <Grid Grid.Row="3">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="260" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <DockPanel Margin="0,0,12,0">
+          <TextBlock DockPanel.Dock="Top" Text="Games on SteamGridDB" FontWeight="SemiBold" Margin="0,0,0,6" />
+          <ListBox x:Name="Games" DisplayMemberPath="Name" SelectionChanged="OnGameSelected" />
+        </DockPanel>
+        <DockPanel Grid.Column="1">
+          <TextBlock DockPanel.Dock="Top" x:Name="CoversTitle" Text="Covers" FontWeight="SemiBold" Margin="0,0,0,6" />
+          <ListBox x:Name="Covers" SelectionMode="Single" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Width="112" Height="168" Margin="2" CornerRadius="4" ClipToBounds="True" ToolTip="{Binding Tooltip}"
+                        Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                  <Image Source="{Binding Image}" Stretch="UniformToFill" />
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Grid>
+
+      <StackPanel Grid.Row="4" Margin="0,12,0,0">
+        <TextBlock Text="Official name (IGDB)" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <ComboBox x:Name="Names" />
+        <TextBlock x:Name="Status" Style="{StaticResource Secondary}" FontSize="12" Margin="0,8,0,0" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="2" Margin="24,8,24,16">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <ui:Button Content="Forget the match and detect again" Click="OnReset" HorizontalAlignment="Left" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <ui:Button Content="Cancel" Click="OnCancel" Margin="0,0,8,0" />
+        <ui:Button x:Name="UseButton" Content="Use this" Appearance="Primary" Click="OnUse" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</ui:FluentWindow>

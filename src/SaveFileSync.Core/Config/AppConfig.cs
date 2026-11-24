@@ -46,6 +46,9 @@ public sealed class AppConfig
     /// </summary>
     public bool HistoryCleanup { get; set; } = true;
 
+    /// <summary>Show the library as a grid of covers instead of a list.</summary>
+    public bool GridView { get; set; }
+
     /// <summary>Emulator id → folder of its exe on this PC (e.g. "rpcs3" → "C:\Emulators\RPCS3").</summary>
     public Dictionary<string, string> EmulatorDirs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 

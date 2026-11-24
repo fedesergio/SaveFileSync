@@ -24,6 +24,11 @@ public sealed class AppPaths
 
     public string CacheDirectory => Path.Combine(Root, "cache");
 
+    /// <summary>Encrypted API keys (DPAPI, this Windows account only).</summary>
+    public string SecretsFile => Path.Combine(Root, "secrets.dat");
+
+    public string CoversDirectory => Path.Combine(CacheDirectory, "covers");
+
     public static string DefaultBase =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SaveFileSync");
 

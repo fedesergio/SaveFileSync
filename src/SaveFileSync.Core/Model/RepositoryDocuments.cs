@@ -125,6 +125,29 @@ public sealed class UnitSource
 }
 
 /// <summary>
+/// What the metadata sources know about a game (PLAN.md §11, phase 4). Shared by all PCs so that a
+/// match corrected once applies everywhere; contains only public identifiers, never keys or paths.
+/// </summary>
+public sealed class UnitMetadata
+{
+    public long? SteamGridDbGameId { get; init; }
+
+    /// <summary>Thumbnail of the chosen cover on SteamGridDB (every PC downloads it itself, no key needed).</summary>
+    public string? CoverUrl { get; init; }
+
+    /// <summary>Author of the cover, for attribution.</summary>
+    public string? CoverAuthor { get; init; }
+
+    public long? IgdbId { get; init; }
+
+    /// <summary>Official name from IGDB.</summary>
+    public string? OfficialName { get; init; }
+
+    /// <summary>True once the user picked the match by hand: automatic matching never touches it again.</summary>
+    public bool Confirmed { get; init; }
+}
+
+/// <summary>
 /// A unit definition revision (<c>units/&lt;unitId&gt;/def/&lt;revision&gt;-&lt;devShort&gt;.json</c>).
 /// The highest (revision, device) pair wins.
 /// </summary>
@@ -158,6 +181,9 @@ public sealed class UnitDefinition
     /// <summary>How many versions stay restorable; null means <see cref="DefaultKeepVersions"/>. Shared by all PCs.</summary>
     public int? KeepVersions { get; init; }
 
+    /// <summary>Cover and official name (phase 4); null until a metadata source matched the game.</summary>
+    public UnitMetadata? Metadata { get; init; }
+
     public const int DefaultKeepVersions = 10;
 
     public int EffectiveKeepVersions => Math.Clamp(KeepVersions ?? DefaultKeepVersions, 1, 1000);
@@ -172,9 +198,11 @@ public sealed class UnitDefinition
         MergeGranularity? granularity = null,
         bool? removed = null,
         UnitSource? source = null,
-        int? keepVersions = null) => new()
+        int? keepVersions = null,
+        UnitMetadata? metadata = null) => new()
     {
         KeepVersions = keepVersions ?? KeepVersions,
+        Metadata = metadata ?? Metadata,
         UnitId = UnitId,
         Name = name ?? Name,
         Locations = locations ?? Locations,

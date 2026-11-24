@@ -41,6 +41,7 @@
     <ProjectReference Include="..\SaveFileSync.Core\SaveFileSync.Core.csproj" />
     <ProjectReference Include="..\SaveFileSync.Repository\SaveFileSync.Repository.csproj" />
     <ProjectReference Include="..\SaveFileSync.Manifest\SaveFileSync.Manifest.csproj" />
+    <ProjectReference Include="..\SaveFileSync.Metadata\SaveFileSync.Metadata.csproj" />
     <ProjectReference Include="..\SaveFileSync.Windows\SaveFileSync.Windows.csproj" />
   </ItemGroup>
 

@@ -59,6 +59,7 @@ public partial class UnitDetailsWindow : FluentWindow
 
         Locations.ItemsSource = _locations;
         GameName.Text = _definition.Name;
+        ShowCover();
         ProcessNames.Text = string.Join("; ", _definition.ProcessNames.Select(p => p + ".exe"));
         Granularity.ItemsSource = GranularityOptions.Texts;
         Granularity.SelectedIndex = GranularityOptions.IndexOf(_definition.Granularity);
@@ -67,6 +68,39 @@ public partial class UnitDetailsWindow : FluentWindow
         host.Service.StatusChanged += OnStatusChanged;
         Closed += (_, _) => host.Service.StatusChanged -= OnStatusChanged;
         Refresh(App.FindStatus(unitId));
+    }
+
+    private void ShowCover()
+    {
+        var metadata = _definition.Metadata;
+        var path = _host.Metadata.CoverPath(_definition);
+        var image = CoverImage.Load(path, 200);
+        CoverPicture.Source = image;
+        CoverPlaceholder.Visibility = image is null ? Visibility.Visible : Visibility.Collapsed;
+        OfficialName.Text = metadata?.OfficialName is { } official
+            ? $"Official name: {official}"
+            : metadata?.CoverUrl is not null ? "" : "No cover or official name yet.";
+        CoverCredit.Text = metadata?.CoverAuthor is { } author ? $"Cover by {author} on SteamGridDB" : "";
+        UseOfficialName.Visibility = metadata?.OfficialName is { } name
+            && !string.Equals(name, GameName.Text.Trim(), StringComparison.Ordinal)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void OnChangeCover(object sender, RoutedEventArgs e)
+    {
+        new CoverPickerWindow(_host, _unitId) { Owner = this }.ShowDialog();
+        _definition = _host.Service!.GetDefinition(_unitId) ?? _definition;
+        ShowCover();
+    }
+
+    private void OnUseOfficialName(object sender, RoutedEventArgs e)
+    {
+        if (_definition.Metadata?.OfficialName is { } name)
+        {
+            GameName.Text = name; // saved with "Save changes", like any other edit
+            UseOfficialName.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void OnStatusChanged(IReadOnlyList<UnitStatus> status) =>

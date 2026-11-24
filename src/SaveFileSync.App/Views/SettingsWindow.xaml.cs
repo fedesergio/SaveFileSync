@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using Microsoft.Win32;
+using SaveFileSync.Core.Config;
+using SaveFileSync.Metadata;
 using SaveFileSync.Windows;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -33,11 +35,120 @@ public partial class SettingsWindow : FluentWindow
         DefaultKeep.Value = config.DefaultKeepVersions;
         HistoryCleanup.IsChecked = config.HistoryCleanup;
         ShowDatabaseStatus();
+        IgdbId.Text = host.Secrets.Get(SecretNames.IgdbClientId) ?? "";
+        ShowKeyStatus();
         About.Text =
             $"SaveFileSync {AppHost.AppVersion}\n" +
             "Save locations: Ludusavi manifest (https://github.com/mtkennerly/ludusavi-manifest), compiled from PCGamingWiki " +
             "(https://www.pcgamingwiki.com). Personal, non-commercial use.\n" +
+            "Covers: SteamGridDB (https://www.steamgriddb.com), community artwork that belongs to its authors. " +
+            "Game names: IGDB.com (https://www.igdb.com), a Twitch company.\n" +
             "Built with .NET, WPF-UI, SQLite, YamlDotNet and Serilog.";
+    }
+
+    private void ShowKeyStatus()
+    {
+        var hasSgdb = !string.IsNullOrEmpty(_host.Secrets.Get(SecretNames.SteamGridDbKey));
+        SgdbStatus.Text = hasSgdb ? "A key is saved on this PC. Paste a new one to replace it." : "No key: covers are not looked up on this PC.";
+        RemoveSgdb.IsEnabled = hasSgdb;
+        SgdbKey.PlaceholderText = hasSgdb ? "Saved (hidden)" : "Paste your key";
+
+        var hasIgdb = !string.IsNullOrEmpty(_host.Secrets.Get(SecretNames.IgdbClientSecret));
+        IgdbStatus.Text = hasIgdb ? "Credentials are saved on this PC. Paste a new secret to replace it." : "No credentials: official names are not looked up on this PC.";
+        RemoveIgdb.IsEnabled = hasIgdb;
+        IgdbSecret.PlaceholderText = hasIgdb ? "Saved (hidden)" : "Client secret";
+    }
+
+    private string? TypedOrStoredSgdbKey() =>
+        SgdbKey.Password.Length > 0 ? SgdbKey.Password.Trim() : _host.Secrets.Get(SecretNames.SteamGridDbKey);
+
+    private (string Id, string Secret)? TypedOrStoredIgdb()
+    {
+        var id = IgdbId.Text.Trim();
+        var secret = IgdbSecret.Password.Length > 0 ? IgdbSecret.Password.Trim() : _host.Secrets.Get(SecretNames.IgdbClientSecret);
+        return id.Length > 0 && !string.IsNullOrEmpty(secret) ? (id, secret) : null;
+    }
+
+    private async void OnTestSgdb(object sender, RoutedEventArgs e)
+    {
+        TestSgdb.IsEnabled = false;
+        SgdbStatus.Text = "Testing…";
+        try
+        {
+            var key = TypedOrStoredSgdbKey();
+            await new SteamGridDbClient(_host.Http, () => key).TestKeyAsync(default);
+            SgdbStatus.Text = "The key works.";
+        }
+        catch (MetadataException ex)
+        {
+            SgdbStatus.Text = ex.Message;
+        }
+        finally
+        {
+            TestSgdb.IsEnabled = true;
+        }
+    }
+
+    private async void OnTestIgdb(object sender, RoutedEventArgs e)
+    {
+        TestIgdb.IsEnabled = false;
+        IgdbStatus.Text = "Testing…";
+        try
+        {
+            var credentials = TypedOrStoredIgdb();
+            await new IgdbClient(_host.Http, () => credentials).TestCredentialsAsync(default);
+            IgdbStatus.Text = "The credentials work.";
+        }
+        catch (MetadataException ex)
+        {
+            IgdbStatus.Text = ex.Message;
+        }
+        finally
+        {
+            TestIgdb.IsEnabled = true;
+        }
+    }
+
+    private void OnRemoveSgdb(object sender, RoutedEventArgs e)
+    {
+        _host.Secrets.Set(SecretNames.SteamGridDbKey, null);
+        SgdbKey.Password = "";
+        ShowKeyStatus();
+    }
+
+    private void OnRemoveIgdb(object sender, RoutedEventArgs e)
+    {
+        _host.Secrets.Set(SecretNames.IgdbClientId, null);
+        _host.Secrets.Set(SecretNames.IgdbClientSecret, null);
+        IgdbId.Text = "";
+        IgdbSecret.Password = "";
+        ShowKeyStatus();
+    }
+
+    /// <summary>Stores what was typed; returns true if a key changed (so earlier failures are forgotten).</summary>
+    private bool SaveKeys()
+    {
+        var changed = false;
+        if (SgdbKey.Password.Trim().Length > 0)
+        {
+            _host.Secrets.Set(SecretNames.SteamGridDbKey, SgdbKey.Password.Trim());
+            changed = true;
+        }
+
+        var id = IgdbId.Text.Trim();
+        if (id != (_host.Secrets.Get(SecretNames.IgdbClientId) ?? ""))
+        {
+            _host.Secrets.Set(SecretNames.IgdbClientId, id);
+            changed = true;
+        }
+
+        if (IgdbSecret.Password.Trim().Length > 0)
+        {
+            _host.Secrets.Set(SecretNames.IgdbClientSecret, IgdbSecret.Password.Trim());
+            changed = true;
+        }
+
+        return changed;
     }
 
     private void ShowDatabaseStatus()
@@ -159,6 +270,11 @@ public partial class SettingsWindow : FluentWindow
             c.DefaultKeepVersions = (int)(DefaultKeep.Value ?? c.DefaultKeepVersions);
             c.HistoryCleanup = HistoryCleanup.IsChecked == true;
         });
+
+        if (SaveKeys())
+        {
+            _host.Metadata.ResetAttempts();
+        }
 
         if (StartWithWindows.IsChecked == true)
         {

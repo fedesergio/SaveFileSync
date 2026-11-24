@@ -20,6 +20,53 @@ public partial class MainWindow : FluentWindow
         Closed += (_, _) => _viewModel.Dispose();
     }
 
+    /// <summary>Dev self-test: switches to the grid and back, and puts a generated cover on the first game.</summary>
+    public async Task<IReadOnlyList<string>> SelfTestAsync()
+    {
+        var problems = new List<string>();
+        var original = _viewModel.IsGridView;
+        _viewModel.IsGridView = !original;
+        await Task.Delay(300);
+
+        if (_viewModel.Units.FirstOrDefault() is { } unit)
+        {
+            var path = Path.Combine(Path.GetTempPath(), "sfs-selftest-cover-" + Guid.NewGuid().ToString("N")[..8] + ".png");
+            try
+            {
+                var pixels = new byte[8 * 12 * 4];
+                Array.Fill(pixels, (byte)200);
+                var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(8, 12, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, 8 * 4);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                await using (var stream = File.Create(path))
+                {
+                    encoder.Save(stream);
+                }
+
+                await unit.SetCoverAsync(path);
+                await Task.Delay(200);
+                if (!unit.HasCover)
+                {
+                    problems.Add("A generated cover was not loaded.");
+                }
+
+                await unit.SetCoverAsync(null);
+                if (unit.HasCover)
+                {
+                    problems.Add("Clearing the cover did not work.");
+                }
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        _viewModel.IsGridView = original;
+        await Task.Delay(100);
+        return problems;
+    }
+
     private void OnAddGame(object sender, RoutedEventArgs e)
     {
         new AddUnitWindow(_host) { Owner = this }.ShowDialog();

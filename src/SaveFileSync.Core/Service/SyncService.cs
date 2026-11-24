@@ -341,6 +341,26 @@ public sealed class SyncService : IDisposable
         return true;
     });
 
+    /// <summary>
+    /// Stores the cover/official-name match of a game (shared by all PCs). Does nothing when it
+    /// would not change anything, so that no needless definition revision is written.
+    /// </summary>
+    public Task<bool> SetMetadataAsync(string unitId, UnitMetadata metadata) => Invoke(() =>
+    {
+        var current = _engine.Remote.ReadUnitDefinition(unitId);
+        if (current is null || current.Removed || Same(current.Metadata, metadata))
+        {
+            return false;
+        }
+
+        _engine.Remote.WriteUnitDefinition(current.Revised(_device.ShortId, _clock.UtcNow, metadata: metadata), _device.ShortId);
+        RefreshUnits();
+        return true;
+    });
+
+    private static bool Same(UnitMetadata? a, UnitMetadata b) =>
+        a is not null && Json.Serialize(a).AsSpan().SequenceEqual(Json.Serialize(b));
+
     public Task<IReadOnlyList<DeviceRow>> GetDevicesAsync() => Invoke(() => _history.GetDevices());
 
     public Task RetireDeviceAsync(string deviceId) => Invoke(() =>

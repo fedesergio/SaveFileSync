@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-11-24 — Phase 4
+
+### Added
+- **Covers** from SteamGridDB and **official names** from IGDB, both optional and
+  using your own free keys (*Settings → Covers and official names*, with *Test*).
+  Keys are encrypted with DPAPI in `secrets.dat` on each PC and never leave it.
+- Automatic matching by Steam id or by name (a different sequel number never
+  matches by itself), a **Change cover or match…** window to correct it, and
+  *Use the official name*.
+- **Grid view** of the library with covers (and a list with small covers),
+  remembered per PC; attribution in the footer and in *About*.
+- The match is shared with your other PCs in the game's definition; each PC
+  downloads the cover itself, with no key.
+
+### Notes
+- Only game names and Steam ids are sent to SteamGridDB / IGDB. Only `https`
+  images from SteamGridDB are downloaded (max 4 MB).
+- Without keys nothing changes and nothing is requested.
+
 ## [0.4.0] — 2026-11-24 — Phase 3
 
 ### Added

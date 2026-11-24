@@ -45,6 +45,29 @@
         <TextBlock Text="Name" Style="{StaticResource SectionTitle}" />
         <ui:TextBox x:Name="GameName" />
 
+        <TextBlock Text="Cover" Style="{StaticResource SectionTitle}" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Border Width="100" Height="150" CornerRadius="6" ClipToBounds="True"
+                  Background="{DynamicResource ControlFillColorSecondaryBrush}">
+            <Grid>
+              <ui:SymbolIcon x:Name="CoverPlaceholder" Symbol="Games24" FontSize="32" />
+              <Image x:Name="CoverPicture" Stretch="UniformToFill" />
+            </Grid>
+          </Border>
+          <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+            <TextBlock x:Name="OfficialName" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock x:Name="CoverCredit" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0" />
+            <WrapPanel Margin="0,8,0,0">
+              <ui:Button Content="Change cover or match…" Icon="{ui:SymbolIcon Image24}" Click="OnChangeCover" Margin="0,0,8,8" />
+              <ui:Button x:Name="UseOfficialName" Content="Use the official name" Click="OnUseOfficialName" Margin="0,0,8,8" />
+            </WrapPanel>
+          </StackPanel>
+        </Grid>
+
         <TextBlock Text="Save folders on this PC" Style="{StaticResource SectionTitle}" />
         <TextBlock x:Name="BindingHint" Style="{StaticResource Secondary}" FontSize="12" />
         <ui:Button x:Name="AutoDetectButton" Content="Find folders automatically" Icon="{ui:SymbolIcon Search24}"

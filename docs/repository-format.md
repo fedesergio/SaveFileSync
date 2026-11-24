@@ -62,6 +62,25 @@ optional; older definitions simply lack them):
 }
 ```
 
+Phase 4 adds an optional `metadata` object (cover and official name). It holds only
+public identifiers, never keys or paths:
+
+```json
+{
+  "metadata": {
+    "steamGridDbGameId": 4,
+    "coverUrl": "https://cdn2.steamgriddb.com/thumb/<hash>.jpg",
+    "coverAuthor": "someone",
+    "igdbId": 113112,
+    "officialName": "Hades",
+    "confirmed": false          // true once the user chose the match by hand
+  }
+}
+```
+
+Each PC downloads the cover from `coverUrl` into its own cache; the repository
+never contains images.
+
 `templates` say where another PC should look for the folder, with tokens such
 as `<winAppData>`, `<winLocalAppData>`, `<winDocuments>`, `<home>` and
 `<base>` (= a library folder plus one of `installDirs`). They contain no

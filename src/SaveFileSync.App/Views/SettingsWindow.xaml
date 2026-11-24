@@ -84,6 +84,40 @@
         <TextBlock Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0"
                    Text="Save locations come from the Ludusavi manifest, compiled from PCGamingWiki. It is downloaded on this PC only (about 17 MB) and checked at most once a week when you add a game." />
 
+        <TextBlock Text="Covers and official names (optional)" Style="{StaticResource SectionTitle}" />
+        <TextBlock Style="{StaticResource Secondary}" FontSize="12"
+                   Text="Covers come from SteamGridDB and official names from IGDB, each with a free key of your own. Only game names (and Steam ids) are sent to these services. The keys are stored encrypted on this PC only, never in the shared folder: enter them on each PC. A cover you choose is shared with your other PCs and downloaded there without a key." />
+
+        <TextBlock Text="SteamGridDB API key" Margin="0,12,0,4" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ui:PasswordBox x:Name="SgdbKey" PlaceholderText="Paste your key" />
+          <ui:Button Grid.Column="1" x:Name="TestSgdb" Content="Test" Click="OnTestSgdb" Margin="8,0,0,0" />
+          <ui:Button Grid.Column="2" x:Name="RemoveSgdb" Content="Remove" Click="OnRemoveSgdb" Margin="8,0,0,0" />
+        </Grid>
+        <TextBlock x:Name="SgdbStatus" Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0" />
+        <ui:HyperlinkButton Content="Get a key: steamgriddb.com, Preferences, API" NavigateUri="https://www.steamgriddb.com/profile/preferences/api" Padding="0" />
+
+        <TextBlock Text="IGDB (Twitch) client id" Margin="0,12,0,4" />
+        <ui:TextBox x:Name="IgdbId" PlaceholderText="Client ID of your Twitch application" />
+        <TextBlock Text="IGDB (Twitch) client secret" Margin="0,8,0,4" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ui:PasswordBox x:Name="IgdbSecret" PlaceholderText="Client secret" />
+          <ui:Button Grid.Column="1" x:Name="TestIgdb" Content="Test" Click="OnTestIgdb" Margin="8,0,0,0" />
+          <ui:Button Grid.Column="2" x:Name="RemoveIgdb" Content="Remove" Click="OnRemoveIgdb" Margin="8,0,0,0" />
+        </Grid>
+        <TextBlock x:Name="IgdbStatus" Style="{StaticResource Secondary}" FontSize="12" Margin="0,4,0,0" />
+        <ui:HyperlinkButton Content="Get credentials: dev.twitch.tv/console (needs two-factor authentication)" NavigateUri="https://dev.twitch.tv/console/apps" Padding="0" />
+
         <TextBlock Text="Troubleshooting" Style="{StaticResource SectionTitle}" />
         <WrapPanel>
           <ui:Button Content="Open logs" Icon="{ui:SymbolIcon DocumentText24}" Click="OnOpenLogs" Margin="0,0,8,8" />

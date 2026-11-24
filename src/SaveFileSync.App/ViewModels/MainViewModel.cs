@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -25,6 +26,11 @@ public sealed partial class UnitItemViewModel : ObservableObject
     [ObservableProperty]
     private string _note = "";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCover))]
+    private ImageSource? _cover;
+
+    private string? _coverPath;
     private DateTime? _quietUntil;
     private string _baseDetail = "";
 
@@ -35,8 +41,33 @@ public sealed partial class UnitItemViewModel : ObservableObject
 
     public string UnitId { get; }
 
-    public void Update(UnitStatus status)
+    public bool HasCover => Cover is not null;
+
+    /// <summary>Loads the cover from the cache folder (decoded small, off the UI thread). Null clears it.</summary>
+    public async Task SetCoverAsync(string? path)
     {
+        if (path == _coverPath)
+        {
+            return;
+        }
+
+        _coverPath = path;
+        if (path is null)
+        {
+            Cover = null;
+            return;
+        }
+
+        var image = await Task.Run(() => CoverImage.Load(path, CoverImage.TileWidth));
+        if (_coverPath == path)
+        {
+            Cover = image;
+        }
+    }
+
+    public void Update(UnitStatus status, string? coverPath)
+    {
+        _ = SetCoverAsync(coverPath);
         Name = status.Name;
         State = status.State;
         _baseDetail = status.Detail;
@@ -84,6 +115,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _problem;
 
+    [ObservableProperty]
+    private bool _isGridView;
+
+    /// <summary>Attribution line, shown while at least one cover is displayed.</summary>
+    [ObservableProperty]
+    private string _coversCredit = "";
+
     public MainViewModel(AppHost host)
     {
         _host = host;
@@ -95,10 +133,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         _loading = true;
         StartWithWindows = Autostart.IsEnabled(host.Profile);
+        IsGridView = config.GridView;
         _loading = false;
 
         _service.StatusChanged += OnStatusChanged;
         host.Config.Changed += OnConfigChanged;
+        host.Metadata.UnitChanged += OnMetadataChanged;
         Apply(_service.CurrentStatus);
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -136,6 +176,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    [RelayCommand]
+    private void ToggleView() => IsGridView = !IsGridView;
+
+    partial void OnIsGridViewChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _host.Config.Update(c => c.GridView = value);
+        }
+    }
+
     partial void OnStartWithWindowsChanged(bool value)
     {
         if (_loading)
@@ -158,7 +209,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _timer.Stop();
         _service.StatusChanged -= OnStatusChanged;
         _host.Config.Changed -= OnConfigChanged;
+        _host.Metadata.UnitChanged -= OnMetadataChanged;
     }
+
+    private void OnMetadataChanged(string unitId) =>
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(() => Apply(_service.CurrentStatus));
 
     private void OnStatusChanged(IReadOnlyList<UnitStatus> status) =>
         System.Windows.Application.Current.Dispatcher.BeginInvoke(() => Apply(status));
@@ -181,6 +236,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             }
         }
 
+        var anyCover = false;
         for (var i = 0; i < ordered.Count; i++)
         {
             var existing = Units.FirstOrDefault(u => u.UnitId == ordered[i].UnitId);
@@ -194,8 +250,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 Units.Move(Units.IndexOf(existing), Math.Min(i, Units.Count - 1));
             }
 
-            existing.Update(ordered[i]);
+            var definition = _service.GetDefinition(ordered[i].UnitId);
+            var coverPath = definition is null ? null : _host.Metadata.CoverPath(definition);
+            anyCover |= coverPath is not null;
+            existing.Update(ordered[i], coverPath);
         }
+
+        CoversCredit = anyCover ? " · covers: SteamGridDB" : "";
 
         HasUnits = Units.Count > 0;
         IsPaused = App.Current.IsPaused();

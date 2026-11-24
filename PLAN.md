@@ -1,6 +1,6 @@
 # SaveFileSync — Plan
 
-Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`), phase 3 (`v0.4.0`)
+Status: **approved** (2026-11-18) · Implemented: phase 1a (`v0.1.0`), phase 1b (`v0.2.0`), phase 2 (`v0.3.0`), phase 3 (`v0.4.0`), phase 4 (`v0.5.0`)
 
 SaveFileSync is a personal Windows tool that keeps game saves in sync across
 several PCs (Windows 11 desktop, ROG Xbox Ally X, future machines) using the
@@ -28,6 +28,8 @@ covers them); a read-only Steam *backup* is a later phase.
 | D12 | Recovery | Saves can be recovered without the sync engine from phase 1a: a read-only `export` CLI, a `README.txt` in the repository, and a documented format (§4.1). |
 | D13 | Handheld sleep | A "newer save available — close the game" notice when a running game's save is outdated, also after resume from sleep (§6.6). |
 | D14 | Old versions | **Archive, never delete manifests**: archived versions keep the history connected for merges; only their files are cleaned up, in two steps with a 14-day wait (§11, phase 3). |
+
+| D15 | Metadata match | The match (SteamGridDB game, chosen cover URL, IGDB id, official name) is stored **in the unit definition**, so a correction made once applies on every PC. Covers are downloaded and cached **per PC** from the public URL (no key needed there); keys stay on each PC, DPAPI-encrypted. Only game names and Steam ids are sent to the services (§11, phase 4). |
 
 ---
 
@@ -80,13 +82,14 @@ src/
   SaveFileSync.Manifest/         # Ludusavi manifest download/index, path patterns, emulator presets
   SaveFileSync.Windows/          # known folders, OneDrive detection/pinning, process monitor,
                                  # autostart, DPAPI, registry, Controlled Folder Access checks
-  SaveFileSync.Metadata/         # (phase 4) SteamGridDB / IGDB clients + cover cache
+  SaveFileSync.Metadata/         # SteamGridDB / IGDB clients, name matching, cover cache (phase 4)
   SaveFileSync.Steam/            # (phase 5) Steam library/userdata discovery, read-only backup
   SaveFileSync.App/              # WPF app, tray, views, composition root
 tests/
   SaveFileSync.Core.Tests/
   SaveFileSync.Repository.Tests/
   SaveFileSync.Manifest.Tests/
+  SaveFileSync.Metadata.Tests/   # API clients against fake HTTP, DPAPI store, matching
   SaveFileSync.Simulation.Tests/ # two-PC simulation (see §10)
 ```
 
@@ -925,6 +928,59 @@ blobs, unreadable files, stale marks).
 | SteamGridDB | Free API key from a user account | Generous for personal use; community-uploaded art | **Covers/grids** (also many emulated titles) |
 | IGDB | Twitch developer app (client id + secret) | ~4 req/s; attribution | **Official names**, platforms |
 | RAWG | Free key | ~20k req/month; attribution required; weaker on consoles | Not used (fallback option) |
+
+#### Implemented in phase 4
+
+- **Keys.** *Settings → Covers and official names*: SteamGridDB API key, IGDB
+  client id + secret, each with a *Test* button and *Remove*. Stored in
+  `%LOCALAPPDATA%\SaveFileSync\secrets.dat`, encrypted with DPAPI for the Windows
+  account (`DpapiSecretStore`); never shown again, logged, exported in
+  diagnostics, or written to git or the repository. Without keys nothing is
+  requested: the feature is simply off.
+- **What leaves the PC:** the game name (the manifest name when known) and the
+  Steam app id, to SteamGridDB and IGDB only. No paths, unit ids, PC names or
+  save data. The HTTP client identifies itself as `SaveFileSync/<version>`.
+- **Matching** (`MetadataService`, a background loop: 20 s after start, every
+  30 minutes, and when games are added):
+  1. SteamGridDB: by Steam app id when the unit has one, else autocomplete search
+     by name. A result is accepted automatically only if its normalized name
+     matches the game's (`NameMatcher`: case, punctuation, accents, "The", ™ ignored;
+     different sequel numbers such as "Hades" / "Hades II" never match
+     automatically). Then the best-rated static portrait cover (600×900 and the
+     two other Steam sizes; NSFW/humor/epilepsy excluded) is chosen.
+  2. IGDB: search by name, same acceptance rule, stores the official name and id.
+  3. No confident match: tried again after 30 days; a network failure after 1 h; a
+     rejected key stops that service until the key changes; HTTP 429 pauses the
+     pass for the time the service asks (15 min by default). Bookkeeping is local
+     (`cache\metadata-state.json`).
+- **User override.** *Game → Change cover or match…*: search both services, pick
+  the game, a cover from up to 30 thumbnails, and an official name. A choice made
+  by hand is `confirmed` and never changed automatically; *Forget the match* clears
+  it. *Use the official name* copies it into the name field.
+- **Sharing.** The match is a new optional `metadata` object in the unit
+  definition (`docs/repository-format.md`); other PCs download the cover from its
+  URL on their next pass, with no key. Older apps ignore the field (and drop it
+  if they write a new definition revision, after which a PC with keys matches again).
+- **Cover cache** `cache\covers\<hash of url>.img`: only `https` URLs on
+  `*.steamgriddb.com` (or `s3.amazonaws.com/steamgriddb/`) are fetched, images up to
+  4 MB, atomically written; unused covers are removed after a day. Covers are
+  decoded at 180 px wide, off the UI thread, so a large library stays cheap; the
+  background process holds no images.
+- **UI.** The main window has a list (small cover) and a grid (tiles with name and
+  state) view, remembered per PC. The footer credits SteamGridDB while covers are
+  shown, and *About* credits SteamGridDB and IGDB.
+- **Rate limits.** IGDB: a request gap of 300 ms (limit is 4/s); SteamGridDB has no
+  published limit, requests are sequential and a 429 is honoured.
+- **Tests** (fake HTTP, no network): both clients (headers, token reuse and
+  renewal, 401 refresh, error classes, query escaping), name matching,
+  cover cache (allowed hosts, size/type checks, prune), DPAPI store (encrypted on
+  disk, restart, corrupt file), the service (match by Steam id and by name,
+  sequels not auto-matched, retry rules, rejected key, rate limit, confirmed
+  choice, cover from another PC without a key, privacy of what is sent), and the
+  definition round trip between two PCs.
+- **Not verified yet** (needs real keys): the live responses of SteamGridDB and IGDB
+  beyond the documented shape. Both services were only reached with deliberately
+  wrong credentials, which they reject as expected (401 and 400).
 
 ### Phase 5 — Steam read-only backup → `v0.6.0` (MVP++)
 

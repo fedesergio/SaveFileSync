@@ -8,6 +8,86 @@
                  WindowStartupLocation="CenterScreen"
                  ExtendsContentIntoTitleBar="True"
                  WindowBackdropType="Mica">
+  <ui:FluentWindow.Resources>
+    <!-- List row: small cover, name, status. -->
+    <DataTemplate x:Key="ListItemTemplate" DataType="{x:Type vm:UnitItemViewModel}">
+      <ui:CardAction Margin="0,0,0,8" Click="OnUnitClicked" Tag="{Binding UnitId}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <Border Width="40" Height="60" CornerRadius="4" Margin="0,0,14,0" ClipToBounds="True"
+                  Background="{DynamicResource ControlFillColorSecondaryBrush}">
+            <Grid>
+              <ui:SymbolIcon Symbol="Games24" FontSize="20" Visibility="{Binding HasCover, Converter={StaticResource InverseBoolToVisibility}}" />
+              <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+            </Grid>
+          </Border>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" Margin="0,2,0,0" />
+            <TextBlock Text="{Binding LastSyncText}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0" />
+            <TextBlock Text="{Binding Note}" Foreground="#D9821E" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+          <Border Grid.Column="2" Style="{StaticResource Chip}" Background="{Binding State, Converter={StaticResource StateToBrush}}" Margin="12,0,0,0">
+            <TextBlock Text="{Binding State, Converter={StaticResource StateToText}}" Foreground="White" FontSize="12" />
+          </Border>
+        </Grid>
+      </ui:CardAction>
+    </DataTemplate>
+
+    <!-- Grid tile: cover with the name and the state over its lower edge. -->
+    <Style x:Key="TileButton" TargetType="Button">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Frame" CornerRadius="8" BorderThickness="2" BorderBrush="Transparent" ClipToBounds="True">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <DataTemplate x:Key="GridItemTemplate" DataType="{x:Type vm:UnitItemViewModel}">
+      <Button Style="{StaticResource TileButton}" Click="OnUnitClicked" Tag="{Binding UnitId}"
+              Width="172" Height="258" Margin="0,0,12,12" ToolTip="{Binding Name}"
+              AutomationProperties.Name="{Binding Name}">
+        <Grid Background="{DynamicResource ControlFillColorSecondaryBrush}">
+          <ui:SymbolIcon Symbol="Games24" FontSize="44" Visibility="{Binding HasCover, Converter={StaticResource InverseBoolToVisibility}}" />
+          <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+          <Border VerticalAlignment="Bottom" Padding="8,18,8,8">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#00000000" Offset="0" />
+                <GradientStop Color="#E6000000" Offset="0.55" />
+              </LinearGradientBrush>
+            </Border.Background>
+            <StackPanel>
+              <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="SemiBold" TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis" />
+              <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                <Ellipse Width="8" Height="8" Margin="0,0,6,0" VerticalAlignment="Center" Fill="{Binding State, Converter={StaticResource StateToBrush}}" />
+                <TextBlock Text="{Binding State, Converter={StaticResource StateToText}}" Foreground="#DDFFFFFF" FontSize="11" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Button>
+    </DataTemplate>
+  </ui:FluentWindow.Resources>
+
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -31,6 +111,20 @@
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <ui:Button Content="Add game" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Click="OnAddGame" Margin="0,0,8,0" />
         <ui:Button Content="Sync all now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncAllCommand}" Margin="0,0,8,0" />
+        <ui:Button Command="{Binding ToggleViewCommand}" Margin="0,0,8,0" AutomationProperties.Name="Switch between list and grid">
+          <ui:Button.Style>
+            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+              <Setter Property="Icon" Value="{ui:SymbolIcon Grid24}" />
+              <Setter Property="ToolTip" Value="Grid view" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsGridView}" Value="True">
+                  <Setter Property="Icon" Value="{ui:SymbolIcon TextBulletListSquare24}" />
+                  <Setter Property="ToolTip" Value="List view" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ui:Button.Style>
+        </ui:Button>
         <ui:Button Icon="{ui:SymbolIcon History24}" ToolTip="Activity" Click="OnActivity" Margin="0,0,8,0" />
         <ui:Button Icon="{ui:SymbolIcon People24}" ToolTip="Devices" Click="OnDevices" Margin="0,0,8,0" />
         <ui:Button Icon="{ui:SymbolIcon Settings24}" ToolTip="Settings" Click="OnSettings" Margin="0,0,8,0" />
@@ -59,27 +153,23 @@
                  Visibility="{Binding HasUnits, Converter={StaticResource InverseBoolToVisibility}}" />
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <ItemsControl ItemsSource="{Binding Units}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate DataType="{x:Type vm:UnitItemViewModel}">
-              <ui:CardAction Margin="0,0,0,8" Click="OnUnitClicked" Tag="{Binding UnitId}" Icon="{ui:SymbolIcon Games24}">
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <StackPanel>
-                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Detail}" Style="{StaticResource Secondary}" Margin="0,2,0,0" />
-                    <TextBlock Text="{Binding LastSyncText}" Style="{StaticResource Secondary}" FontSize="12" Margin="0,2,0,0" />
-                    <TextBlock Text="{Binding Note}" Foreground="#D9821E" FontSize="12" TextWrapping="Wrap" />
-                  </StackPanel>
-                  <Border Grid.Column="1" Style="{StaticResource Chip}" Background="{Binding State, Converter={StaticResource StateToBrush}}" Margin="12,0,0,0">
-                    <TextBlock Text="{Binding State, Converter={StaticResource StateToText}}" Foreground="White" FontSize="12" />
-                  </Border>
-                </Grid>
-              </ui:CardAction>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
+          <ItemsControl.Style>
+            <Style TargetType="ItemsControl">
+              <Setter Property="ItemTemplate" Value="{StaticResource ListItemTemplate}" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsGridView}" Value="True">
+                  <Setter Property="ItemTemplate" Value="{StaticResource GridItemTemplate}" />
+                  <Setter Property="ItemsPanel">
+                    <Setter.Value>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </Setter.Value>
+                  </Setter>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ItemsControl.Style>
         </ItemsControl>
       </ScrollViewer>
     </Grid>
@@ -90,7 +180,7 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <TextBlock Style="{StaticResource Secondary}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
-        <Run Text="{Binding DeviceName, Mode=OneWay}" /><Run Text=" · repository: " /><Run Text="{Binding RepositoryPath, Mode=OneWay}" /><Run Text=" · v" /><Run Text="{Binding Version, Mode=OneWay}" />
+        <Run Text="{Binding DeviceName, Mode=OneWay}" /><Run Text=" · repository: " /><Run Text="{Binding RepositoryPath, Mode=OneWay}" /><Run Text=" · v" /><Run Text="{Binding Version, Mode=OneWay}" /><Run Text="{Binding CoversCredit, Mode=OneWay}" />
       </TextBlock>
       <CheckBox Grid.Column="1" Content="Start with Windows" IsChecked="{Binding StartWithWindows}" />
     </Grid>

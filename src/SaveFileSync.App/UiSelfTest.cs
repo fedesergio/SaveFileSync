@@ -56,6 +56,7 @@ internal static class UiSelfTest
             factories.Add(("UnitDetailsWindow", () => new UnitDetailsWindow(host, unitId)));
             factories.Add(("HistoryWindow", () => new HistoryWindow(host, unitId)));
             factories.Add(("ConflictWindow", () => new ConflictWindow(host, unitId)));
+            factories.Add(("CoverPickerWindow", () => new CoverPickerWindow(host, unitId)));
         }
 
         foreach (var (name, create) in factories)
@@ -71,6 +72,7 @@ internal static class UiSelfTest
                 {
                     AddUnitWindow add => await add.SelfTestAsync(),
                     HistoryWindow history => await history.SelfTestAsync(),
+                    MainWindow main => await main.SelfTestAsync(),
                     _ => [],
                 };
                 foreach (var problem in problems)

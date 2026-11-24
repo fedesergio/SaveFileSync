@@ -17,10 +17,13 @@ emulators) in sync across several PCs, using OneDrive as the transport.
   a fallback, and presets for RPCS3 and Ryujinx.
 - History browser: restore, pin and export any version, with a configurable
   number of versions kept (older ones are archived and cleaned up carefully).
-- Planned: cover art, read-only Steam backups.
+- Covers (SteamGridDB) and official names (IGDB), optional, with your own free
+  keys; list or grid view.
+- Planned: read-only Steam backups.
 
-**Status:** phase 3 (`v0.4.0`) — history and restore, retention, devices (on top
-of automatic detection and emulator presets from phase 2).
+**Status:** phase 4 (`v0.5.0`) — covers and official names, on top of history and
+restore, retention, devices (phase 3) and automatic detection with emulator
+presets (phase 2).
 See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
 
 **Stack:** .NET 10, WPF (WPF-UI), SQLite for local state, YamlDotNet.
@@ -44,6 +47,19 @@ See [PLAN.md](PLAN.md) and [CHANGELOG.md](CHANGELOG.md).
    as *Not set up on this PC*: open it and use *Find folders automatically* or
    *Browse…*. If saves already exist there and differ, you choose which version
    to keep: nothing is overwritten silently.
+
+## Covers and official names (optional)
+
+*Settings → Covers and official names* takes a free **SteamGridDB** API key
+(covers) and/or the client id and secret of a free **Twitch** application
+(**IGDB**, official names; needs two-factor authentication on the Twitch
+account). Enter them on each PC: they are stored encrypted for your Windows
+account in `%LOCALAPPDATA%\SaveFileSync\secrets.dat`, never in git or in the
+OneDrive folder. The app then finds a cover for each game by itself; open a game and
+*Change cover or match…* to correct it. A cover you pick is shown on your other
+PCs too (they download it themselves, without a key). Only game names and Steam
+ids are sent to these services. The main window can show the library as a grid of
+covers. Covers belong to their authors on SteamGridDB.
 
 ## History and restore
 

@@ -14,6 +14,9 @@
     <!-- Manifest -->
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
 
+    <!-- Windows -->
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+
     <!-- App -->
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageVersion Include="WPF-UI" Version="4.2.0" />
